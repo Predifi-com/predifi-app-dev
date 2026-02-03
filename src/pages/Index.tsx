@@ -10,6 +10,7 @@ import { X } from "lucide-react";
 import thesisTradeBg from "@/assets/thesis-trade-bg.png";
 import thesisTomorrowBg from "@/assets/thesis-tomorrow-bg.png";
 import thesisTodayBg from "@/assets/thesis-today-bg.png";
+import { WaitlistCTA } from "@/components/WaitlistCTA";
 
 type MarketDomain = "default" | "politics" | "sports" | "conflict" | "crypto" | "macro";
 type ThesisWord = "TRADE" | "TOMORROW" | "TODAY";
@@ -1583,6 +1584,9 @@ const Index = () => {
         >
           EXPLORE MARKETS →
         </div>
+
+        {/* CTA: Get Access / Waitlist Status - Centered */}
+        <WaitlistCTA />
 
         {/* CTA: Soft Stake with Pulsing Glow & Magnetic Effect */}
         <div 
