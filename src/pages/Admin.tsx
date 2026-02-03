@@ -13,7 +13,6 @@ import { MarketsManager } from "@/components/admin/MarketsManager";
 import { AnalyticsCharts } from "@/components/admin/AnalyticsCharts";
 import { ApiHealthMonitor } from "@/components/admin/ApiHealthMonitor";
 import { RateLimitMonitor } from "@/components/admin/RateLimitMonitor";
-import { WaitlistAdminTab } from "@/components/admin/WaitlistAdminTab";
 import { ArenaAdminTab } from "@/components/admin/ArenaAdminTab";
 import { WalletButton } from "@/components/WalletButton";
 import { supabase } from "@/integrations/supabase/client";
@@ -22,7 +21,6 @@ import { toast } from "sonner";
 import { 
   ShieldAlert, 
   LayoutDashboard, 
-  Users, 
   Trophy,
   Shield,
   LogOut,
@@ -255,14 +253,10 @@ export default function Admin() {
 
           {/* Main Tabs */}
           <Tabs value={defaultTab} onValueChange={handleTabChange} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="dashboard" className="gap-2">
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="waitlist" className="gap-2">
-                <Users className="w-4 h-4" />
-                Waitlist
               </TabsTrigger>
               <TabsTrigger value="arena" className="gap-2">
                 <Trophy className="w-4 h-4" />
@@ -291,11 +285,6 @@ export default function Admin() {
                   <MarketsManager markets={customMarkets} />
                 </>
               )}
-            </TabsContent>
-
-            {/* Waitlist Tab */}
-            <TabsContent value="waitlist">
-              <WaitlistAdminTab />
             </TabsContent>
 
             {/* Arena Tab */}
