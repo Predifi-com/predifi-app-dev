@@ -42,12 +42,28 @@ export default function Waitlist() {
       // Check if email already exists
       const { data: existing } = await supabase
         .from("waitlist_signups")
-        .select("id")
+        .select("id, referral_code, email")
         .ilike("email", values.email)
         .maybeSingle();
 
       if (existing) {
-        toast.error("This email is already on the waitlist!");
+        // User already on waitlist - show their existing data
+        localStorage.setItem("waitlist_email", existing.email);
+        setSignupData({
+          id: existing.id,
+          referralCode: existing.referral_code || "N/A",
+          email: existing.email,
+        });
+        
+        // Get their position
+        const { data: positionData } = await supabase
+          .rpc("get_waitlist_position", { user_email: existing.email });
+        if (positionData) {
+          setPosition(positionData as number);
+        }
+        
+        setIsSuccess(true);
+        toast.info("Welcome back! Here's your waitlist info.");
         setIsSubmitting(false);
         return;
       }
