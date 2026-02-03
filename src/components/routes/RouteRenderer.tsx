@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { Route, Navigate } from "react-router-dom";
 import { PageTransition, SlideTransition } from "@/components/PageTransition";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
-import { WaitlistRoute } from "@/components/WaitlistRoute";
 import {
   PageLoadingSkeleton,
   MarketDetailSkeleton,
@@ -67,18 +66,17 @@ export function renderPublicRoutes(routes: RouteConfig[]) {
 }
 
 export function renderGatedRoutes(routes: RouteConfig[]) {
+  // Gating removed - all routes are now public
   return routes.map(({ path, component: Component, skeleton, transition }) => (
     <Route
       key={path}
       path={path}
       element={
-        <WaitlistRoute>
-          <TransitionWrapper transition={transition}>
-            <SuspenseWrapper skeleton={skeleton}>
-              <Component />
-            </SuspenseWrapper>
-          </TransitionWrapper>
-        </WaitlistRoute>
+        <TransitionWrapper transition={transition}>
+          <SuspenseWrapper skeleton={skeleton}>
+            <Component />
+          </SuspenseWrapper>
+        </TransitionWrapper>
       }
     />
   ));
@@ -103,23 +101,20 @@ export function renderProtectedRoutes(routes: RouteConfig[]) {
 }
 
 export function renderArenaRoutes(routes: RouteConfig[]) {
-  return routes.map(({ path, component: Component, skeleton, transition, bypassGate }) => {
-    const content = (
-      <TransitionWrapper transition={transition}>
-        <SuspenseWrapper skeleton={skeleton}>
-          <Component />
-        </SuspenseWrapper>
-      </TransitionWrapper>
-    );
-
-    return (
-      <Route
-        key={path}
-        path={path}
-        element={bypassGate ? content : <WaitlistRoute>{content}</WaitlistRoute>}
-      />
-    );
-  });
+  // Gating removed - all arena routes are now public
+  return routes.map(({ path, component: Component, skeleton, transition }) => (
+    <Route
+      key={path}
+      path={path}
+      element={
+        <TransitionWrapper transition={transition}>
+          <SuspenseWrapper skeleton={skeleton}>
+            <Component />
+          </SuspenseWrapper>
+        </TransitionWrapper>
+      }
+    />
+  ));
 }
 
 export function renderNotFoundRoute(route: RouteConfig) {
