@@ -24,6 +24,7 @@ export default function Waitlist() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [position, setPosition] = useState<number | null>(null);
+  const [signupData, setSignupData] = useState<{ id: string; referralCode: string; email: string } | null>(null);
 
   const form = useForm<WaitlistFormValues>({
     resolver: zodResolver(waitlistSchema),
@@ -55,15 +56,25 @@ export default function Waitlist() {
       const referralCode = `REF-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
       // Insert into waitlist
-      const { error } = await supabase.from("waitlist_signups").insert({
+      const { data: insertedData, error } = await supabase.from("waitlist_signups").insert({
         email: values.email.toLowerCase().trim(),
         wallet_address: values.walletAddress?.trim() || null,
         referred_by: values.referralCode?.trim() || null,
         referral_code: referralCode,
         priority_score: values.referralCode ? 10 : 0, // Bonus for referred users
-      });
+      }).select("id").single();
 
       if (error) throw error;
+
+      // Store email in localStorage for the CTA to check
+      localStorage.setItem("waitlist_email", values.email.toLowerCase().trim());
+      
+      // Store signup data for success screen
+      setSignupData({
+        id: insertedData.id,
+        referralCode: referralCode,
+        email: values.email.toLowerCase().trim(),
+      });
 
       // Update referrer's count if referral code was used
       if (values.referralCode) {
@@ -134,10 +145,29 @@ export default function Waitlist() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="text-center space-y-4">
-                {position && (
-                  <div className="p-4 rounded-lg bg-muted/50 border border-border">
-                    <p className="text-sm text-muted-foreground mb-1">Your position</p>
-                    <p className="text-4xl font-bold text-primary">#{position}</p>
+                {signupData && (
+                  <div className="p-4 rounded-lg bg-muted/50 border border-border space-y-3">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Your ID</p>
+                      <p className="text-sm font-mono text-foreground bg-muted px-2 py-1 rounded">
+                        {signupData.id}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Your Referral Code</p>
+                      <p className="text-lg font-bold text-primary">
+                        {signupData.referralCode}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Share this code with friends to move up the waitlist!
+                      </p>
+                    </div>
+                    {position && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Your Position</p>
+                        <p className="text-4xl font-bold text-primary">#{position}</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 <p className="text-sm text-muted-foreground">
