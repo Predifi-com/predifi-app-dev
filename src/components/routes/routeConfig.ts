@@ -2,6 +2,7 @@ import { lazy, ComponentType } from "react";
 
 // Lazy load pages
 const Index = lazy(() => import("@/pages/Index"));
+const Waitlist = lazy(() => import("@/pages/Waitlist"));
 const KeywordSearch = lazy(() => import("@/pages/KeywordSearch"));
 const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const Rewards = lazy(() => import("@/pages/Rewards"));
@@ -51,6 +52,7 @@ export interface RouteConfig {
 // ─────────────────────────────────────────────────────────────
 export const publicRoutes: RouteConfig[] = [
   { path: "/", component: Index, transition: "page" },
+  { path: "/waitlist", component: Waitlist, transition: "page" },
   { path: "/privacy-policy", component: PrivacyPolicy, transition: "page" },
   { path: "/terms-of-service", component: TermsOfService, transition: "page" },
   // Arena terminal - fully public for testing
