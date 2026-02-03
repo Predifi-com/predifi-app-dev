@@ -74,6 +74,7 @@ export function useRealtimePrices(symbols: string[] = ['BTC/USD', 'ETH/USD', 'SO
         setLastUpdate(Date.now());
         setIsConnected(true);
       },
+      undefined, // onError callback (optional)
       1000 // 1 second polling
     );
     

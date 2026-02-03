@@ -129,6 +129,7 @@ export function TradingChart({ marketAddress, showHeader = false }: TradingChart
           return updated;
         });
       },
+      undefined, // onError callback (optional)
       1000 // Poll every 1 second
     );
     
