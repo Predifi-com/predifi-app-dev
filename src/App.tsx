@@ -22,11 +22,22 @@ import { AnimatedRoutes } from "@/components/AnimatedRoutes";
 import { AdminFloatingButton } from "@/components/AdminFloatingButton";
 import { PredifiWalletProvider } from "@/contexts/PredifiWalletContext";
 import { usePageTracking } from "@/hooks/usePageTracking";
+import { useEffect } from "react";
 
 const queryClient = new QueryClient();
 
 function AppContent() {
   usePageTracking();
+
+  // Catch unhandled promise rejections (e.g. MetaMask connection failures)
+  useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.warn("Unhandled rejection caught:", event.reason);
+      event.preventDefault();
+    };
+    window.addEventListener("unhandledrejection", handleRejection);
+    return () => window.removeEventListener("unhandledrejection", handleRejection);
+  }, []);
   
   return (
     <>
