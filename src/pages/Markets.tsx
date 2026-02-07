@@ -76,16 +76,24 @@ const Markets = () => {
   // Transform markets into displayable items (simplified without groups)
   const displayMarkets = useMemo(() => {
     return filteredMarkets.map(market => ({
-      type: 'single' as const,
+      type: 'binary' as const,
       market: {
         id: market.id,
         title: market.question,
-        description: market.description,
-        yesPercentage: 50, // Default since we don't have price data yet
-        totalVolume: 0, // Default
+        description: market.description || '',
+        yesPrice: 0.5,
+        noPrice: 0.5,
+        yesPercentage: 50,
+        noPercentage: 50,
+        totalVolume: 0,
+        liquidity: 0,
+        volume24h: 0,
+        openInterest: 0,
         endDate: market.resolution_time,
         status: market.status,
         venue: market.venues?.[0]?.venue || 'predifi',
+        category: '',
+        createdAt: '',
       }
     }));
   }, [filteredMarkets]);
