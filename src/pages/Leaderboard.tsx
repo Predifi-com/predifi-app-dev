@@ -5,18 +5,63 @@ import { Badge } from "@/components/ui/badge";
 import { Trophy, TrendingUp, Coins } from "lucide-react";
 import { SEO } from "@/components/SEO";
 import { AIModelLeaderboard } from "@/components/AIModelLeaderboard";
+import { FollowTraderModal } from "@/components/FollowTraderModal";
+import { Button } from "@/components/ui/button";
+import { UserPlus } from "lucide-react";
+import { useState, useEffect } from "react";
+
+interface Trader {
+  rank: number;
+  user_address: string;
+  total_pnl: number;
+  total_trades: number;
+  win_rate: number;
+  total_volume: number;
+}
 
 const Leaderboard = () => {
-  const topTraders = [
-    { rank: 1, name: "CryptoKing", profit: "$127,543", trades: 892, winRate: 76, avatar: "👑" },
-    { rank: 2, name: "MarketMaster", profit: "$98,234", trades: 743, winRate: 72, avatar: "🎯" },
-    { rank: 3, name: "PredictorPro", profit: "$87,123", trades: 654, winRate: 69, avatar: "⚡" },
-    { rank: 4, name: "TradeWizard", profit: "$76,890", trades: 612, winRate: 67, avatar: "🔮" },
-    { rank: 5, name: "BetGenius", profit: "$65,432", trades: 567, winRate: 64, avatar: "🧠" },
-    { rank: 6, name: "OddsOracle", profit: "$54,321", trades: 523, winRate: 62, avatar: "🎲" },
-    { rank: 7, name: "FutureSeer", profit: "$48,765", trades: 489, winRate: 60, avatar: "👁️" },
-    { rank: 8, name: "ChartChaser", profit: "$42,109", trades: 445, winRate: 58, avatar: "📈" },
-  ];
+  const [topTraders, setTopTraders] = useState<Trader[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [stats, setStats] = useState({ totalVolume: 0, activeTraders: 0, totalMarkets: 0 });
+  const [followModalOpen, setFollowModalOpen] = useState(false);
+  const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const response = await fetch('/api/leaderboard?limit=20');
+      const data = await response.json();
+      
+      if (data.success) {
+        setTopTraders(data.leaderboard);
+        setStats({
+          totalVolume: data.stats?.totalVolume || 0,
+          activeTraders: data.stats?.activeTraders || 0,
+          totalMarkets: data.stats?.totalMarkets || 0
+        });
+      } else {
+        setError('Failed to load leaderboard');
+      }
+    } catch (err) {
+      console.error('Leaderboard error:', err);
+      setError('Failed to connect to server');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const shortenAddress = (address: string) => {
+    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  };
+
+  const formatProfit = (pnl: number) => {
+    const sign = pnl >= 0 ? '+' : '';
+    return `${sign}$${pnl.toLocaleString()}`;
+  };
 
   const getRankDisplay = (rank: number) => {
     if (rank === 1) return { icon: <Trophy className="w-5 h-5 text-warning" />, class: "text-warning" };
@@ -34,12 +79,22 @@ const Leaderboard = () => {
       <Header />
       
       <div className="px-4 py-8 max-w-5xl mx-auto">
-        {/* Development Banner */}
-        <div className="mb-6 py-3 px-4 bg-muted border border-border rounded-md">
-          <p className="text-xs text-center text-muted-foreground uppercase tracking-wide">
-            <span className="text-warning">Development Mode</span> — Leaderboard data shown is for demonstration
-          </p>
-        </div>
+        {/* Development Banner - Remove when live */}
+        {loading && (
+          <div className="mb-6 py-3 px-4 bg-muted border border-border rounded-md">
+            <p className="text-xs text-center text-muted-foreground uppercase tracking-wide">
+              Loading leaderboard...
+            </p>
+          </div>
+        )}
+        
+        {error && (
+          <div className="mb-6 py-3 px-4 bg-destructive/10 border border-destructive rounded-md">
+            <p className="text-xs text-center text-destructive uppercase tracking-wide">
+              {error}
+            </p>
+          </div>
+        )}
 
         {/* Header */}
         <div className="mb-8">
@@ -56,7 +111,7 @@ const Leaderboard = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</p>
-                <p className="text-xl font-semibold text-foreground">$2.4M</p>
+                <p className="text-xl font-semibold text-foreground">${(stats.totalVolume / 1000000).toFixed(1)}M</p>
               </div>
             </div>
           </Card>
@@ -67,7 +122,7 @@ const Leaderboard = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Traders</p>
-                <p className="text-xl font-semibold text-foreground">8,432</p>
+                <p className="text-xl font-semibold text-foreground">{stats.activeTraders.toLocaleString()}</p>
               </div>
             </div>
           </Card>
@@ -78,7 +133,7 @@ const Leaderboard = () => {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Markets</p>
-                <p className="text-xl font-semibold text-foreground">1,247</p>
+                <p className="text-xl font-semibold text-foreground">{stats.totalMarkets.toLocaleString()}</p>
               </div>
             </div>
           </Card>
@@ -98,19 +153,22 @@ const Leaderboard = () => {
           {/* Table Header */}
           <div className="hidden md:grid grid-cols-12 gap-4 px-4 py-3 bg-muted/50 text-xs text-muted-foreground uppercase tracking-wide border-b border-border">
             <div className="col-span-1">Rank</div>
-            <div className="col-span-4">Trader</div>
+            <div className="col-span-3">Trader</div>
             <div className="col-span-2 text-right">Trades</div>
-            <div className="col-span-3 text-right">Profit</div>
+            <div className="col-span-2 text-right">Profit</div>
             <div className="col-span-2 text-right">Win Rate</div>
+            <div className="col-span-2 text-center">Action</div>
           </div>
 
           {/* Table Body */}
           <div className="divide-y divide-border">
             {topTraders.map((trader) => {
               const rankDisplay = getRankDisplay(trader.rank);
+              const avatarEmoji = ['👑', '🎯', '⚡', '🔮', '🧠', '🎲', '👁️', '📈', '💎', '🚀'][trader.rank - 1] || '🌟';
+              
               return (
                 <div
-                  key={trader.rank}
+                  key={trader.user_address}
                   className="grid grid-cols-12 gap-4 px-4 py-4 items-center hover:bg-muted/30 transition-colors duration-150"
                 >
                   {/* Rank */}
@@ -119,40 +177,78 @@ const Leaderboard = () => {
                   </div>
 
                   {/* Trader Info */}
-                  <div className="col-span-4 flex items-center gap-3">
+                  <div className="col-span-3 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-lg">
-                      {trader.avatar}
+                      {avatarEmoji}
                     </div>
                     <div>
-                      <p className="font-medium text-foreground text-sm">{trader.name}</p>
-                      <p className="text-xs text-muted-foreground md:hidden">{trader.trades} trades</p>
+                      <p className="font-medium text-foreground text-sm font-mono">{shortenAddress(trader.user_address)}</p>
+                      <p className="text-xs text-muted-foreground md:hidden">{trader.total_trades} trades</p>
                     </div>
                   </div>
 
                   {/* Trades */}
                   <div className="hidden md:block col-span-2 text-right">
-                    <span className="text-sm text-muted-foreground">{trader.trades}</span>
+                    <span className="text-sm text-muted-foreground">{trader.total_trades}</span>
                   </div>
 
                   {/* Profit */}
-                  <div className="col-span-3 text-right">
-                    <span className="text-sm font-medium text-success">{trader.profit}</span>
+                  <div className="col-span-2 text-right">
+                    <span className={`text-sm font-medium ${trader.total_pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
+                      {formatProfit(trader.total_pnl)}
+                    </span>
                   </div>
 
                   {/* Win Rate */}
                   <div className="col-span-2 text-right">
                     <Badge variant="secondary" className="text-xs font-medium">
-                      {trader.winRate}%
+                      {trader.win_rate.toFixed(1)}%
                     </Badge>
+                  </div>
+
+                  {/* Follow Button */}
+                  <div className="col-span-2 flex justify-center">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-2"
+                      onClick={() => {
+                        setSelectedTrader(trader);
+                        setFollowModalOpen(true);
+                      }}
+                    >
+                      <UserPlus className="w-3 h-3" />
+                      <span className="hidden sm:inline">Follow</span>
+                    </Button>
                   </div>
                 </div>
               );
             })}
+            
+            {topTraders.length === 0 && !loading && (
+              <div className="px-4 py-8 text-center text-muted-foreground">
+                No traders found. Start trading to appear on the leaderboard!
+              </div>
+            )}
           </div>
         </Card>
       </div>
 
       <Footer />
+
+      {/* Follow Trader Modal */}
+      {selectedTrader && (
+        <FollowTraderModal
+          open={followModalOpen}
+          onOpenChange={setFollowModalOpen}
+          traderAddress={selectedTrader.user_address}
+          traderStats={{
+            winRate: selectedTrader.win_rate,
+            totalPnl: selectedTrader.total_pnl,
+            totalTrades: selectedTrader.total_trades
+          }}
+        />
+      )}
     </div>
   );
 };

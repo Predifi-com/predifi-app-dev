@@ -8,18 +8,15 @@ import { SEO } from "@/components/SEO";
 
 import { useState, useEffect, useMemo } from "react";
 import InfiniteScroll from "react-infinite-scroll-component";
-import { usePredifiMarkets } from "@/hooks/usePredifiMarkets";
-import { useMarketGroups } from "@/hooks/useMarketGroups";
+import { useLocalMarkets } from "@/hooks/useLocalMarkets";
 import { MarketCardWrapper } from "@/components/MarketCardWrapper";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { MarketCardSkeleton } from "@/components/MarketCardSkeleton";
 import { MarketFiltersSettings } from "@/components/MarketFiltersSettings";
-import { TrendingKeywords } from "@/components/TrendingKeywords";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { Search } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -27,7 +24,6 @@ const Markets = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
   const [category, setCategory] = useState<string>(searchParams.get('category') || "all");
   const [venue, setVenue] = useState<string>(searchParams.get('venue') || "all");
@@ -36,6 +32,16 @@ const Markets = () => {
     searchParams.get('minVolume') ? Number(searchParams.get('minVolume')) : undefined
   );
   const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
+
+  // Fetch markets from local backend
+  const { markets, loading: isLoading, error } = useLocalMarkets();
+
+  // Display error if markets fail to load
+  useEffect(() => {
+    if (error) {
+      toast.error("Failed to load markets. Make sure backend is running on port 4000.");
+    }
+  }, [error]);
 
   // Sync filters to URL
   useEffect(() => {
@@ -50,47 +56,45 @@ const Markets = () => {
   // Parse sort string into field and direction
   const [sortField, sortDir] = sortBy.split('_');
 
-  // Transform markets into groups
-  const { markets, isLoading, pagination, loadMore, refresh } = usePredifiMarkets({
-    status: showClosed ? undefined : 'open',
-    venue: (venue && venue !== 'all' ? venue : undefined) as any,
-    category: (category && category !== 'all' ? category : undefined),
-    limit: 24,
-    sort_by: sortField,
-    sort_dir: sortDir as 'asc' | 'desc',
-    min_volume: minVolume,
-    autoLoad: true,
-  });
+  // Filter and transform markets
+  const filteredMarkets = useMemo(() => {
+    return markets
+      .filter(market => {
+        // Filter by status
+        if (!showClosed && market.status !== 'OPEN') return false;
+        
+        // Filter by venue
+        if (venue && venue !== 'all') {
+          const hasVenue = market.venues?.some(v => v.venue.toLowerCase() === venue.toLowerCase());
+          if (!hasVenue) return false;
+        }
+        
+        return true;
+      });
+  }, [markets, showClosed, venue]);
 
-  // Refresh when filters change
-  useEffect(() => {
-    refresh();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [category, venue, sortBy, minVolume, showClosed]);
+  // Transform markets into displayable items (simplified without groups)
+  const displayMarkets = useMemo(() => {
+    return filteredMarkets.map(market => ({
+      type: 'single' as const,
+      market: {
+        id: market.id,
+        title: market.question,
+        description: market.description,
+        yesPercentage: 50, // Default since we don't have price data yet
+        totalVolume: 0, // Default
+        endDate: market.resolution_time,
+        status: market.status,
+        venue: market.venues?.[0]?.venue || 'predifi',
+      }
+    }));
+  }, [filteredMarkets]);
 
   // Refresh handler
   const handleRefresh = async () => {
-    await refresh();
+    window.location.reload();
     toast.success("Markets refreshed");
   };
-
-  // Transform markets into groups and normalize
-  const marketItems = useMarketGroups(markets);
-
-  const displayMarkets = useMemo(() => {
-    if (!marketItems.length) return [];
-
-    const sorted = [...marketItems].sort((a, b) => {
-      if (sortField === 'volumeTotal' || sortField === 'volume24h') {
-        const aVol = a.type === 'group' ? a.group.totalVolume : a.market.totalVolume;
-        const bVol = b.type === 'group' ? b.group.totalVolume : b.market.totalVolume;
-        return sortDir === 'asc' ? aVol - bVol : bVol - aVol;
-      }
-      return 0;
-    });
-
-    return sorted;
-  }, [marketItems, sortField, sortDir]);
 
   // Grid columns based on density
   const gridColsClass = density === 'compact' 
@@ -146,67 +150,35 @@ const Markets = () => {
             >
               Refresh
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowSearch(true)}
-            >
-              <Search className="w-4 h-4 mr-2" />
-              Search
-            </Button>
           </div>
         </div>
-
-        <MarketSearch open={showSearch} onClose={() => setShowSearch(false)} />
       </div>
       
       {/* Main Content */}
       <div className="px-4 py-6">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           {/* Markets Grid */}
-          <div className="lg:col-span-8 xl:col-span-9">
-            <InfiniteScroll
-              dataLength={displayMarkets.length}
-              next={loadMore}
-              hasMore={pagination.hasMore}
-              loader={
-                <div className={`grid ${gridColsClass} gap-4`}>
-                  {[1, 2, 3, 4].map((n) => (
+          <div className="lg:col-span-12">
+            <div className={`grid ${gridColsClass} gap-4`}>
+              {isLoading ? (
+                <>
+                  {[1, 2, 3, 4, 5, 6].map((n) => (
                     <MarketCardSkeleton key={n} />
                   ))}
+                </>
+              ) : displayMarkets.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-muted-foreground">
+                  <p className="text-sm">No markets found. Make sure the backend is running on port 4000.</p>
                 </div>
-              }
-              endMessage={
-                <div className="col-span-full text-center py-8 text-muted-foreground">
-                  <p className="text-xs uppercase tracking-wide">No more markets</p>
-                </div>
-              }
-            >
-              <div className={`grid ${gridColsClass} gap-4`}>
-                {isLoading ? (
-                  <>
-                    {[1, 2, 3, 4, 5, 6].map((n) => (
-                      <MarketCardSkeleton key={n} />
-                    ))}
-                  </>
-                ) : (
-                  displayMarkets.map((item) => (
-                    <MarketCardWrapper
-                      key={item.type === 'group' ? item.group.groupId : item.market.id}
-                      item={item}
-                      animationsEnabled={animationsEnabled}
-                    />
-                  ))
-                )}
-              </div>
-            </InfiniteScroll>
-          </div>
-
-          {/* Sidebar */}
-          <div className="hidden lg:block lg:col-span-4 xl:col-span-3">
-            <div className="sticky top-20 space-y-4">
-              <TrendingKeywords />
-              <Sidebar />
+              ) : (
+                displayMarkets.map((item) => (
+                  <MarketCardWrapper
+                    key={item.market.id}
+                    item={item}
+                    animationsEnabled={animationsEnabled}
+                  />
+                ))
+              )}
             </div>
           </div>
         </div>

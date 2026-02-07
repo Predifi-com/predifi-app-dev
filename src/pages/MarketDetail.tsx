@@ -16,6 +16,8 @@ import { useMarketDetails } from "@/hooks/useMarketDetails";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
 import { useActivityTracking } from "@/hooks/useActivityTracking";
+import LeverageTradeWidget from "@/components/LeverageTradeWidget";
+import LeveragePositionsList from "@/components/LeveragePositionsList";
 
 const MarketDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -143,6 +145,7 @@ const MarketDetail = () => {
               <Tabs defaultValue="trades">
                 <TabsList className="w-full">
                   <TabsTrigger value="trades" className="flex-1">Recent Trades</TabsTrigger>
+                  <TabsTrigger value="leverage" className="flex-1">Leverage Trading</TabsTrigger>
                   <TabsTrigger value="info" className="flex-1">Market Info</TabsTrigger>
                 </TabsList>
 
@@ -170,6 +173,24 @@ const MarketDetail = () => {
                         </div>
                       </div>
                     ))}
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="leverage" className="mt-4 space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <h3 className="text-lg font-semibold mb-4">Open Leveraged Position</h3>
+                      <LeverageTradeWidget 
+                        marketId={market.id}
+                        currentPrice={market.yesPercentage / 100}
+                        marketName={market.title}
+                      />
+                    </div>
+                    
+                    <div className="pt-6 border-t">
+                      <h3 className="text-lg font-semibold mb-4">Your Positions</h3>
+                      <LeveragePositionsList />
+                    </div>
                   </div>
                 </TabsContent>
 
