@@ -53,7 +53,7 @@ export function FollowTraderModal({
       const message = `Follow Trader\n\nTrader: ${traderAddress}\nAllocation: $${allocationAmount}\nMax Position: $${maxPositionSize || 'No limit'}\nTimestamp: ${Date.now()}`;
       
       // Step 2: Sign the message
-      const signature = await signMessageAsync({ message });
+      const signature = await signMessageAsync({ account: address, message });
 
       // Step 3: Submit to backend
       const response = await fetch('/api/copy-trade/follow', {
