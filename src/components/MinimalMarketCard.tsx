@@ -1,8 +1,10 @@
-import { Bot } from "lucide-react";
+import { Bot, MessageCircle } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { MarketExpandedModal } from "./MarketExpandedModal";
 import { MarketAnalysisChat } from "./MarketAnalysisChat";
+import { Sparkline } from "./Sparkline";
+import { useMarketSparkline } from "@/hooks/useMarketSparkline";
 import { getVenueDisplayName } from "@/lib/venue-utils";
 
 // Consistent color palette for multi-outcome segments
@@ -76,8 +78,10 @@ export function MinimalMarketCard({
       : volume || "$0";
 
   const venueLabel = getVenueDisplayName(venue);
-
   const isMultiOutcome = marketType === "multi_outcome" && outcomes && outcomes.length > 2;
+
+  // Sparkline data
+  const { data: sparklineData } = useMarketSparkline(id, venue);
 
   // For multi-outcome: top 2 + others
   const displaySegments = useMemo(() => {
@@ -110,7 +114,7 @@ export function MinimalMarketCard({
         whileHover={animationsEnabled ? { y: -2 } : {}}
         transition={{ duration: 0.18 }}
         onClick={() => setModalOpen(true)}
-        className="relative group cursor-pointer rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all"
+        className="relative group cursor-pointer rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all flex flex-col h-full"
       >
         {/* AI Analysis icon */}
         <button
@@ -118,21 +122,31 @@ export function MinimalMarketCard({
             e.stopPropagation();
             setAiChatOpen(true);
           }}
-          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity hover:bg-primary/20"
+          className="absolute top-3 right-3 w-8 h-8 rounded-full bg-primary/10 text-primary flex items-center justify-center opacity-60 group-hover:opacity-100 transition-opacity hover:bg-primary/20 z-10"
           aria-label="AI Analysis"
         >
           <Bot className="w-4 h-4" />
         </button>
 
-        {/* Question */}
-        <h3 className="font-semibold text-foreground text-[15px] leading-snug pr-10 mb-4 line-clamp-3">
-          {title}
-        </h3>
+        {/* Image + Question */}
+        <div className="flex gap-3 mb-3 flex-shrink-0">
+          <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
+            {imageUrl ? (
+              <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                <MessageCircle className="w-5 h-5" />
+              </div>
+            )}
+          </div>
+          <h3 className="font-semibold text-foreground text-[15px] leading-snug pr-8 line-clamp-3 flex-1 min-w-0">
+            {title}
+          </h3>
+        </div>
 
-        {/* Probability bar */}
-        <div className="mb-4">
+        {/* Probability bar — grows to fill available space */}
+        <div className="mb-3 flex-1 flex flex-col justify-end">
           {isMultiOutcome ? (
-            /* Multi-outcome stacked bar */
             <>
               <div className="flex h-7 rounded-lg overflow-hidden">
                 {displaySegments.map((seg, i) => (
@@ -156,7 +170,6 @@ export function MinimalMarketCard({
               </div>
             </>
           ) : (
-            /* Binary YES/NO bar */
             <>
               <div className="flex h-7 rounded-lg overflow-hidden">
                 <div
@@ -184,8 +197,15 @@ export function MinimalMarketCard({
           )}
         </div>
 
-        {/* Footer metadata */}
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        {/* Sparkline — compact, informational only */}
+        {sparklineData && sparklineData.length >= 2 && (
+          <div className="mb-3 flex-shrink-0">
+            <Sparkline data={sparklineData} width={200} height={20} strokeWidth={1.5} />
+          </div>
+        )}
+
+        {/* Fixed footer: venue + volume — always pinned at bottom */}
+        <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border mt-auto flex-shrink-0">
           <span className="font-medium">{venueLabel}</span>
           <span className="font-semibold text-foreground/70">{displayVolume}</span>
         </div>
