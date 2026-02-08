@@ -38,6 +38,7 @@ export interface PredifiMarket {
   synced_at: string;
   group_id?: string | null;
   outcome_type: string;
+  outcomes?: Array<{ id: string; label: string; price: number; volume: number }> | null;
   venue_market_id: string;
   market_url: string;
   expires_at: string;
