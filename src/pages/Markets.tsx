@@ -39,7 +39,7 @@ const Markets = () => {
   // Display error if markets fail to load
   useEffect(() => {
     if (error) {
-      toast.error("Failed to load markets. Make sure backend is running on port 4000.");
+      toast.error("Failed to load markets from PrediFi API.");
     }
   }, [error]);
 
@@ -61,39 +61,38 @@ const Markets = () => {
     return markets
       .filter(market => {
         // Filter by status
-        if (!showClosed && market.status !== 'OPEN') return false;
+        if (!showClosed && market.status !== 'active') return false;
         
         // Filter by venue
         if (venue && venue !== 'all') {
-          const hasVenue = market.venues?.some(v => v.venue.toLowerCase() === venue.toLowerCase());
-          if (!hasVenue) return false;
+          if (market.venue?.toLowerCase() !== venue.toLowerCase()) return false;
         }
         
         return true;
       });
   }, [markets, showClosed, venue]);
 
-  // Transform markets into displayable items (simplified without groups)
+  // Transform markets into displayable items
   const displayMarkets = useMemo(() => {
     return filteredMarkets.map(market => ({
       type: 'binary' as const,
       market: {
         id: market.id,
-        title: market.question,
+        title: market.title,
         description: market.description || '',
-        yesPrice: 0.5,
-        noPrice: 0.5,
-        yesPercentage: 50,
-        noPercentage: 50,
-        totalVolume: 0,
-        liquidity: 0,
-        volume24h: 0,
-        openInterest: 0,
-        endDate: market.resolution_time,
+        yesPrice: (market.yes_price ?? 50) / 100,
+        noPrice: (market.no_price ?? 50) / 100,
+        yesPercentage: market.yes_price ?? 50,
+        noPercentage: market.no_price ?? 50,
+        totalVolume: market.volume_total ?? 0,
+        liquidity: market.liquidity ?? 0,
+        volume24h: market.volume_24h ?? 0,
+        openInterest: market.open_interest ?? 0,
+        endDate: market.resolution_date || market.expires_at || '',
         status: market.status,
-        venue: market.venues?.[0]?.venue || 'predifi',
-        category: '',
-        createdAt: '',
+        venue: market.venue || 'predifi',
+        category: market.category || '',
+        createdAt: market.created_at || '',
       }
     }));
   }, [filteredMarkets]);
@@ -176,7 +175,7 @@ const Markets = () => {
                 </>
               ) : displayMarkets.length === 0 ? (
                 <div className="col-span-full text-center py-12 text-muted-foreground">
-                  <p className="text-sm">No markets found. Make sure the backend is running on port 4000.</p>
+                  <p className="text-sm">No markets found.</p>
                 </div>
               ) : (
                 displayMarkets.map((item) => (
