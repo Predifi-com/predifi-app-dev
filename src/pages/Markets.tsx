@@ -114,10 +114,10 @@ const Markets = () => {
 
   // Grid columns based on density
   const gridColsClass = density === 'compact' 
-    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
     : density === 'spacious'
-    ? 'grid-cols-1 lg:grid-cols-2'
-    : 'grid-cols-1 sm:grid-cols-2 xl:grid-cols-3';
+    ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+    : 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4';
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">

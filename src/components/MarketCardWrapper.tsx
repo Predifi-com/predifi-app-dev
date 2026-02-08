@@ -1,5 +1,5 @@
 import { MarketGroupCard } from '@/components/MarketGroupCard';
-import { SwipeableMarketCard } from '@/components/SwipeableMarketCard';
+import { MinimalMarketCard } from '@/components/MinimalMarketCard';
 import type { MarketItem } from '@/types/market-group';
 
 interface MarketCardWrapperProps {
@@ -12,9 +12,18 @@ export function MarketCardWrapper({ item, animationsEnabled = true }: MarketCard
     return <MarketGroupCard group={item.group} animationsEnabled={animationsEnabled} />;
   }
 
+  const m = item.market;
   return (
-    <SwipeableMarketCard
-      {...item.market}
+    <MinimalMarketCard
+      id={m.id}
+      title={m.title}
+      description={m.description}
+      yesPercentage={m.yesPercentage}
+      noPercentage={m.noPercentage}
+      totalVolume={m.totalVolume}
+      venue={m.venue}
+      imageUrl={m.imageUrl}
+      endDate={m.endDate}
       animationsEnabled={animationsEnabled}
     />
   );
