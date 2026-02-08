@@ -55,6 +55,10 @@ export const publicRoutes: RouteConfig[] = [
   { path: "/waitlist", component: Waitlist, transition: "page" },
   { path: "/privacy-policy", component: PrivacyPolicy, transition: "page" },
   { path: "/terms-of-service", component: TermsOfService, transition: "page" },
+  // Markets browsing - publicly accessible
+  { path: "/markets", component: Markets, transition: "page" },
+  { path: "/markets/:id", component: MarketDetail, skeleton: "detail", transition: "slide" },
+  { path: "/leaderboard", component: Leaderboard, skeleton: "table", transition: "page" },
   // Arena terminal - fully public for testing
   { path: "/arena/terminal", component: CompetitorHome, skeleton: "detail", transition: "slide" },
 ];
@@ -63,14 +67,11 @@ export const publicRoutes: RouteConfig[] = [
 // GATED ROUTES - Require waitlist approval (admins bypass)
 // ─────────────────────────────────────────────────────────────
 export const gatedRoutes: RouteConfig[] = [
-  { path: "/markets", component: Markets, transition: "page" },
-  { path: "/markets/:id", component: MarketDetail, skeleton: "detail", transition: "slide" },
   { path: "/archived", component: ArchivedMarkets, transition: "page" },
   { path: "/search", component: KeywordSearch, transition: "page" },
   { path: "/earn", component: Vaults, transition: "page" },
   { path: "/vaults", component: Vaults, transition: "page" },
   { path: "/vault-leaderboard", component: VaultLeaderboard, skeleton: "table", transition: "page" },
-  { path: "/leaderboard", component: Leaderboard, skeleton: "table", transition: "page" },
   { path: "/brand-kit", component: BrandKit, transition: "page" },
   { path: "/demo", component: Demo, transition: "page" },
   { path: "/pitch", component: Pitch, transition: "page" },
