@@ -1,186 +1,224 @@
 /**
- * Predifi API Service
+ * Predifi API Service v2
  * Official API integration for Predifi Protocol
  * Base URL: https://api.predifi.com
+ * Last Updated: February 8, 2026
  */
 
 const BASE_URL = 'https://api.predifi.com';
 
-// ============= API Response Types =============
+// ============= Market Types =============
 
 export interface PredifiMarket {
   id: string;
-  slug: string;
+  venue: 'limitless' | 'polymarket' | 'predifi';
   title: string;
   description?: string;
   category: string;
-  tags: string[];
-  status: 'open' | 'closed' | 'settled' | 'cancelled';
-  startTime: string;
-  endTime: string;
-  closeTime?: string | null;
-  settlementTime?: string | null;
-  settlementSource?: string | null;
-  underlyingAsset?: string | null;
-  imageUrl?: string;
-  outcomes: Outcome[];
-  primaryVenue: 'POLYMARKET' | 'KALSHI' | 'LIMITLESS' | 'PREDIFI_NATIVE';
-  venues: VenueData[];
-  aggregateMetrics: AggregateMetrics;
-  groupId?: string | null;
-  sport?: string | null;
-  eventDate?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface Outcome {
-  index: number;
-  name: string;
-  venueLabel: string;
-}
-
-export interface VenueData {
-  venue: string;
-  metrics: VenueMetrics;
-  raw?: object;
-}
-
-export interface VenueMetrics {
-  lastPriceYes?: number | null;
-  lastPriceNo?: number | null;
-  lastPriceRaw?: number | null;
-  volume24h?: number | null;
-  volumeTotal: number;
-  openInterest?: number | null;
-  liquidity?: number | null;
-}
-
-export interface AggregateMetrics {
-  volume24hTotal?: number | null;
-  volumeTotal: number;
-  venuesWithLiquidity: number;
-}
-
-export interface Pagination {
-  limit: number;
-  offset: number;
-  total: number;
-  hasMore: boolean;
+  status: 'active' | 'resolved' | 'expired';
+  current_price?: number | null;
+  yes_price: number;
+  no_price: number;
+  volume_24h: number;
+  volume_total: number;
+  liquidity: number;
+  open_interest: number;
+  num_trades_24h: number;
+  num_traders: number;
+  resolution_date?: string | null;
+  resolved_outcome?: string | null;
+  trending_score: number;
+  price_change_24h: number;
+  volume_velocity: number;
+  image_url?: string | null;
+  external_url?: string | null;
+  tags?: string[] | null;
+  created_at: string;
+  updated_at: string;
+  synced_at: string;
+  group_id?: string | null;
+  outcome_type: string;
+  venue_market_id: string;
+  market_url: string;
+  expires_at: string;
+  resolved_at?: string | null;
+  winning_outcome?: string | null;
+  accepting_orders: boolean;
+  min_order_size: number;
+  tick_size: number;
 }
 
 export interface ListMarketsResponse {
-  data: PredifiMarket[];
-  pagination: Pagination;
+  success: boolean;
+  markets: PredifiMarket[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
-export interface GetMarketByIdResponse {
-  data: PredifiMarket;
-}
+// ============= Leverage Types =============
 
-// Native Market Types
-export interface NativeMarketStatsResponse {
-  marketId: string;
-  volume24h: number;
-  volumeTotal: number;
-  openInterest: number;
-  liquidity: number;
-  lastPrice: number;
-  priceChange24h: number;
-  numTrades24h: number;
-  timestamp: string;
-}
-
-export interface OrderbookLevel {
-  price: number;
+export interface LeveragePosition {
+  position_id: string;
+  user_id: string;
+  market_id: string;
+  side: 'YES' | 'NO';
+  margin: number;
+  leverage: number;
   size: number;
-  numOrders: number;
+  entry_price: number;
+  liquidation_price: number;
+  current_pnl?: number;
+  close_price?: number;
+  realized_pnl?: number;
+  status: 'OPEN' | 'CLOSED' | 'LIQUIDATED';
+  opened_at: string;
+  closed_at?: string | null;
 }
 
-export interface OrderbookResponse {
-  marketId: string;
-  bids: OrderbookLevel[];
-  asks: OrderbookLevel[];
-  timestamp: string;
+export interface LiquidationCalcResponse {
+  liquidationPrice: number;
+  margin: number;
+  positionSize: number;
+  maxLoss: number;
 }
 
-export interface Trade {
+// ============= Leaderboard & Copy Trading Types =============
+
+export interface LeaderboardEntry {
+  user_id: string;
+  rank: number;
+  total_pnl: number;
+  roi: number;
+  win_rate: number;
+  total_trades: number;
+  followers: number;
+  badge: string;
+}
+
+export interface CopyTradeRelationship {
   id: string;
-  marketId: string;
-  outcomeIndex: number;
-  side: 'buy' | 'sell';
-  price: number;
-  size: number;
-  timestamp: string;
-  buyOrderId?: string;
-  sellOrderId?: string;
+  follower_id: string;
+  leader_id: string;
+  allocation_percentage: number;
+  max_position_size: number;
+  status: 'active' | 'paused';
+  total_copied_trades?: number;
+  total_pnl?: number;
+  created_at: string;
+  paused_at?: string | null;
 }
 
-export interface TradesResponse {
-  marketId: string;
-  trades: Trade[];
-  pagination?: {
-    hasMore: boolean;
-    cursor?: string;
+export interface CopyTradeExecution {
+  execution_id: string;
+  leader_position_id: string;
+  follower_position_id: string;
+  market_id: string;
+  side: 'YES' | 'NO';
+  leader_size: number;
+  follower_size: number;
+  execution_price: number;
+  executed_at: string;
+}
+
+// ============= Balance Types =============
+
+export interface UserBalance {
+  user_id: string;
+  total_balance: number;
+  available_balance: number;
+  locked_balance: number;
+  pending_deposits: number;
+  pending_withdrawals: number;
+}
+
+// ============= Position Types =============
+
+export interface Position {
+  position_id: string;
+  market_id: string;
+  type: 'LEVERAGE' | 'SPOT';
+  side: 'YES' | 'NO';
+  size: number;
+  entry_price: number;
+  current_price: number;
+  unrealized_pnl: number;
+  status: 'OPEN' | 'CLOSED' | 'LIQUIDATED';
+}
+
+// ============= Price Feed Types =============
+
+export interface PriceResponse {
+  success: boolean;
+  product_id: string;
+  price: number;
+  source: string;
+  timestamp: string;
+}
+
+// ============= Oracle Types =============
+
+export interface OracleData {
+  market_id: string;
+  resolution_value: boolean;
+  resolution_source: string;
+  confidence: number;
+  resolved_at: string;
+}
+
+// ============= Withdrawal Types =============
+
+export interface Withdrawal {
+  withdrawal_id: string;
+  user_id?: string;
+  amount: number;
+  status: 'pending' | 'completed' | 'failed';
+  tx_hash?: string;
+  initiated_at?: string;
+  estimated_completion?: string;
+  completed_at?: string;
+}
+
+// ============= Health Types =============
+
+export interface HealthResponse {
+  status: string;
+  service: string;
+  timestamp: string;
+}
+
+export interface WebSocketHealthResponse {
+  status: string;
+  server: { isRunning: boolean; port: number };
+  metrics: {
+    activeConnections: number;
+    totalConnectionsAccepted: number;
+    totalMessagesReceived: number;
+    totalMessagesSent: number;
+    totalBroadcasts: number;
   };
-}
-
-export interface OutcomePrices {
-  outcomeIndex: number;
-  outcomeName: string;
-  bestBid: {
-    price: number;
-    size: number;
-  } | null;
-  bestAsk: {
-    price: number;
-    size: number;
-  } | null;
-  spread: number;
-  midPrice: number;
-}
-
-export interface BestPricesResponse {
-  marketId: string;
-  outcomes: OutcomePrices[];
+  clobClient: { connected: boolean; lastMessageTime: string };
   timestamp: string;
 }
 
-// Trending Keywords Types
-export interface TrendingMarket {
-  id: string;
-  title: string;
-  volume: number;
-  commentCount: number;
+// ============= Error Types =============
+
+export interface ApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, any>;
+  };
+  timestamp: string;
 }
 
-export interface TrendingKeyword {
-  keyword: string;
-  score: number;
-  marketCount: number;
-  totalVolume: number;
-  totalComments: number;
-  sentiment: 'bullish' | 'bearish' | 'neutral';
-  category: string;
-  relatedKeywords: string[];
-  markets: TrendingMarket[];
-}
-
-export interface TrendingKeywordsResponse {
-  keywords: TrendingKeyword[];
-  generatedAt: string;
-  totalMarketsAnalyzed: number;
-  timeWindow?: string;
-  aiGenerated?: boolean;
-  cached?: boolean;
-}
-
-// ============= API Service Class =============
+// ============= API Service =============
 
 class PredifiApiService {
   private async request<T>(endpoint: string, options?: RequestInit): Promise<T> {
     const url = `${BASE_URL}${endpoint}`;
-    
+
     try {
       const response = await fetch(url, {
         ...options,
@@ -191,178 +229,223 @@ class PredifiApiService {
       });
 
       if (!response.ok) {
-        throw new Error(`API Error: ${response.status} ${response.statusText}`);
+        const errorBody = await response.json().catch(() => null);
+        const msg = errorBody?.error?.message || `${response.status} ${response.statusText}`;
+        throw new Error(`API Error: ${msg}`);
       }
 
       return await response.json();
     } catch (error) {
-      console.error('Predifi API request failed:', error);
+      console.error(`Predifi API request failed: ${endpoint}`, error);
       throw error;
     }
   }
 
-  // ============= Market Service =============
+  // ============= Health & Monitoring =============
 
-  /**
-   * Health check
-   */
-  async healthCheck(): Promise<{
-    status: string;
-    timestamp: string;
-    services: { mongo: string; redis: string };
-  }> {
+  async healthCheck(): Promise<HealthResponse> {
     return this.request('/health');
   }
 
-  /**
-   * List markets with filters and pagination
-   */
-  async listMarkets(params?: {
-    status?: 'open' | 'closed' | 'settled' | 'cancelled';
-    venue?: 'POLYMARKET' | 'KALSHI' | 'LIMITLESS' | 'PREDIFI_NATIVE';
-    category?: string;
-    sport?: string;
-    tag?: string;
-    min_volume?: number;
-    min_liquidity?: number;
+  async websocketHealth(): Promise<WebSocketHealthResponse> {
+    return this.request('/health/websocket');
+  }
+
+  async websocketStats(): Promise<{ activeConnections: number; totalMessagesReceived: number; totalMessagesSent: number }> {
+    return this.request('/api/websocket/stats');
+  }
+
+  // ============= Markets =============
+
+  /** List aggregated markets from all venues */
+  async listAggregatedMarkets(params?: {
     limit?: number;
     offset?: number;
-    sort_by?: string;
-    sort_dir?: 'asc' | 'desc';
+    venue?: 'limitless' | 'polymarket' | 'predifi';
+    category?: string;
+    status?: 'active' | 'resolved' | 'expired';
   }): Promise<ListMarketsResponse> {
-    const queryParams = new URLSearchParams();
-    
+    const q = new URLSearchParams();
     if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          queryParams.append(key, value.toString());
-        }
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) q.append(k, v.toString());
       });
     }
-
-    const endpoint = `/api/markets${queryParams.toString() ? `?${queryParams}` : ''}`;
-    return this.request<ListMarketsResponse>(endpoint);
+    return this.request<ListMarketsResponse>(`/api/aggregated${q.toString() ? `?${q}` : ''}`);
   }
 
-  /**
-   * Search markets by text query
-   */
-  async searchMarkets(params: {
-    q: string;
-    status?: 'open' | 'closed' | 'settled' | 'cancelled';
-    venue?: 'POLYMARKET' | 'KALSHI' | 'LIMITLESS' | 'PREDIFI_NATIVE';
-    category?: string;
-    limit?: number;
-    offset?: number;
-  }): Promise<ListMarketsResponse> {
-    const queryParams = new URLSearchParams();
-    
-    Object.entries(params).forEach(([key, value]) => {
-      if (value !== undefined) {
-        queryParams.append(key, value.toString());
-      }
-    });
-
-    return this.request<ListMarketsResponse>(`/api/markets/search?${queryParams}`);
-  }
-
-  /**
-   * Get market by ID or slug
-   */
-  async getMarketById(id: string, includeRaw: boolean = false): Promise<GetMarketByIdResponse> {
-    const params = includeRaw ? '?includeRaw=true' : '';
-    return this.request<GetMarketByIdResponse>(`/api/markets/${id}${params}`);
-  }
-
-  // ============= Native Markets =============
-
-  /**
-   * List native markets only
-   */
+  /** List Predifi-native markets only */
   async listNativeMarkets(params?: {
-    status?: 'draft' | 'open' | 'closed' | 'settled' | 'cancelled';
-    category?: string;
     limit?: number;
     offset?: number;
+    category?: string;
+    status?: 'active' | 'resolved' | 'expired';
   }): Promise<ListMarketsResponse> {
-    const queryParams = new URLSearchParams();
-    
+    const q = new URLSearchParams();
     if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          queryParams.append(key, value.toString());
-        }
+      Object.entries(params).forEach(([k, v]) => {
+        if (v !== undefined) q.append(k, v.toString());
       });
     }
-
-    const endpoint = `/api/native/markets${queryParams.toString() ? `?${queryParams}` : ''}`;
-    return this.request<ListMarketsResponse>(endpoint);
+    return this.request<ListMarketsResponse>(`/api/markets${q.toString() ? `?${q}` : ''}`);
   }
 
-  /**
-   * Get native market statistics
-   */
-  async getNativeMarketStats(marketId: string): Promise<NativeMarketStatsResponse> {
-    return this.request<NativeMarketStatsResponse>(`/api/native/markets/${marketId}/stats`);
+  // ============= Leverage Trading =============
+
+  async calculateLiquidation(params: {
+    side: 'YES' | 'NO';
+    entryPrice: number;
+    leverage: number;
+  }): Promise<LiquidationCalcResponse> {
+    return this.request('/api/leverage/calculate-liquidation', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
   }
 
-  /**
-   * Get native market orderbook
-   */
-  async getNativeMarketOrderbook(marketId: string): Promise<OrderbookResponse> {
-    return this.request<OrderbookResponse>(`/api/native/markets/${marketId}/orderbook`);
+  async getLeveragePositions(userId: string): Promise<{ success: boolean; positions: LeveragePosition[] }> {
+    return this.request(`/api/leverage/positions?userId=${encodeURIComponent(userId)}`);
   }
 
-  /**
-   * Get native market trades
-   */
-  async getNativeMarketTrades(marketId: string): Promise<TradesResponse> {
-    return this.request<TradesResponse>(`/api/native/markets/${marketId}/trades`);
+  async openLeveragePosition(params: {
+    userId: string;
+    marketId: string;
+    side: 'YES' | 'NO';
+    margin: number;
+    leverage: number;
+  }): Promise<{ success: boolean; position: LeveragePosition }> {
+    return this.request('/api/leverage/positions', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
   }
 
-  /**
-   * Get best bid/ask prices for native market
-   */
-  async getNativeMarketBestPrices(marketId: string): Promise<BestPricesResponse> {
-    return this.request<BestPricesResponse>(`/api/native/markets/${marketId}/best-prices`);
+  async closeLeveragePosition(positionId: string, userId: string): Promise<{ success: boolean; position: LeveragePosition }> {
+    return this.request(`/api/leverage/positions/${positionId}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
   }
 
-  // ============= Vertex Service =============
+  // ============= Leaderboard & Copy Trading =============
 
-  /**
-   * Get trending keywords (via short alias)
-   */
-  async getTrendingKeywords(params?: {
+  async getLeaderboard(params?: {
+    sortBy?: 'pnl' | 'roi' | 'winRate';
     limit?: number;
-    hours?: number;
-    cache?: boolean;
-  }): Promise<TrendingKeywordsResponse> {
-    const queryParams = new URLSearchParams();
-    
-    if (params) {
-      Object.entries(params).forEach(([key, value]) => {
-        if (value !== undefined) {
-          queryParams.append(key, value.toString());
-        }
-      });
-    }
-
-    const endpoint = `/trending${queryParams.toString() ? `?${queryParams}` : ''}`;
-    return this.request<TrendingKeywordsResponse>(endpoint);
+  }): Promise<{ success: boolean; leaderboard: LeaderboardEntry[] }> {
+    const q = new URLSearchParams();
+    if (params?.sortBy) q.append('sortBy', params.sortBy);
+    if (params?.limit) q.append('limit', params.limit.toString());
+    return this.request(`/api/leaderboard${q.toString() ? `?${q}` : ''}`);
   }
 
-  /**
-   * Vertex service health check
-   */
-  async vertexHealthCheck(): Promise<{
-    status: string;
-    service: string;
-    uptimeSeconds: number;
-    env: { nodeEnv: string };
-  }> {
-    return this.request('/vertex/health');
+  async createCopyTrade(params: {
+    followerId: string;
+    leaderId: string;
+    allocationPercentage: number;
+    maxPositionSize: number;
+  }): Promise<{ success: boolean; relationship: CopyTradeRelationship }> {
+    return this.request('/api/leaderboard/copy-trade/create', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async listCopyTrades(address: string): Promise<{ success: boolean; relationships: CopyTradeRelationship[] }> {
+    return this.request(`/api/leaderboard/copy-trade/list/${encodeURIComponent(address)}`);
+  }
+
+  async getCopyTradeExecutions(relationshipId: string): Promise<{ success: boolean; executions: CopyTradeExecution[] }> {
+    return this.request(`/api/leaderboard/copy-trade/${relationshipId}/executions`);
+  }
+
+  async pauseCopyTrade(relationshipId: string, userId: string): Promise<{ success: boolean; relationship: CopyTradeRelationship }> {
+    return this.request(`/api/leaderboard/copy-trade/${relationshipId}/pause`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  async deleteCopyTrade(relationshipId: string, userId: string): Promise<{ success: boolean; message: string }> {
+    return this.request(`/api/leaderboard/copy-trade/${relationshipId}`, {
+      method: 'DELETE',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  // ============= Balance =============
+
+  async getBalance(userId: string): Promise<{ success: boolean; balance: UserBalance }> {
+    return this.request(`/api/balance/${encodeURIComponent(userId)}`);
+  }
+
+  async lockBalance(params: {
+    userId: string;
+    amount: number;
+    refType: string;
+    refId: string;
+    reason: string;
+  }): Promise<{ success: boolean; locked: { amount: number; new_available: number; new_locked: number } }> {
+    return this.request('/api/balance/lock', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async unlockBalance(params: {
+    userId: string;
+    refType: string;
+    refId: string;
+    reason: string;
+  }): Promise<{ success: boolean; unlocked: { amount: number; new_available: number; new_locked: number } }> {
+    return this.request('/api/balance/unlock', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  // ============= Positions =============
+
+  async getPositions(userId: string, status?: 'OPEN' | 'CLOSED' | 'LIQUIDATED'): Promise<{ success: boolean; positions: Position[] }> {
+    const q = new URLSearchParams({ userId });
+    if (status) q.append('status', status);
+    return this.request(`/api/positions?${q}`);
+  }
+
+  // ============= Price Feeds =============
+
+  async testPriceFeeds(): Promise<any> {
+    return this.request('/api/prices/test');
+  }
+
+  async getPrice(productId: string, source?: 'coinbase' | 'kraken'): Promise<PriceResponse> {
+    const q = source ? `?source=${source}` : '';
+    return this.request(`/api/prices/${encodeURIComponent(productId)}${q}`);
+  }
+
+  // ============= Oracle =============
+
+  async getOracleData(marketId: string): Promise<{ success: boolean; oracle_data: OracleData }> {
+    return this.request(`/api/oracle/${encodeURIComponent(marketId)}`);
+  }
+
+  // ============= Withdrawals =============
+
+  async initiateWithdrawal(params: {
+    userId: string;
+    amount: number;
+    destinationAddress: string;
+  }): Promise<{ success: boolean; withdrawal: Withdrawal }> {
+    return this.request('/api/withdrawals/initiate', {
+      method: 'POST',
+      body: JSON.stringify(params),
+    });
+  }
+
+  async getWithdrawalStatus(withdrawalId: string): Promise<{ success: boolean; withdrawal: Withdrawal }> {
+    return this.request(`/api/withdrawals/${encodeURIComponent(withdrawalId)}`);
   }
 }
 
-// Export singleton instance
+// Export singleton
 export const predifiApi = new PredifiApiService();

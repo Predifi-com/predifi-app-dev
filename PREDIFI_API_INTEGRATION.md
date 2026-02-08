@@ -1,155 +1,90 @@
-# Predifi API Integration Guide
+# PrediFi API Integration Guide (v2)
 
-This guide covers the official Predifi API integration for the frontend.
+**Base URL:** `https://api.predifi.com`  
+**Version:** v2  
+**Last Updated:** February 8, 2026
 
-## Base URL
-```
-https://api.predifi.com
-```
+## Frontend Service
 
-## Services Available
-
-### 1. Market Service
-- **List Markets**: `/api/markets` - Get paginated markets from all venues
-- **Search Markets**: `/api/markets/search` - Text search with filters
-- **Get Market**: `/api/markets/:id` - Detailed market information
-- **Native Markets**: `/api/native/markets` - Predifi-native markets only
-- **Market Stats**: `/api/native/markets/:id/stats` - Real-time statistics
-- **Orderbook**: `/api/native/markets/:id/orderbook` - Live order book
-- **Trades**: `/api/native/markets/:id/trades` - Recent trades
-- **Best Prices**: `/api/native/markets/:id/best-prices` - Best bid/ask
-
-### 2. WebSocket Service
-**URL**: `wss://predifi-ws-service-395321861753.us-east1.run.app/ws`
-
-**Channels**:
-- `orderbook` - Real-time order book updates
-- `trades` - Live trade executions
-- `ticker` - Market ticker data
-- `stats` - Market statistics
-
-### 3. Trending Keywords (Vertex Service)
-- **Trending**: `/trending` - AI-generated trending keywords
-- **Health**: `/vertex/health` - Service health check
-
-## Frontend Implementation
-
-### Using the API Service
+All API calls go through `src/services/predifi-api.ts` (singleton `predifiApi`).
 
 ```typescript
 import { predifiApi } from '@/services/predifi-api';
-
-// List all markets
-const markets = await predifiApi.listMarkets({
-  status: 'open',
-  category: 'crypto',
-  limit: 50
-});
-
-// Search markets
-const results = await predifiApi.searchMarkets({
-  q: 'bitcoin',
-  venue: 'PREDIFI_NATIVE'
-});
-
-// Get market details
-const market = await predifiApi.getMarketById('691b5e4083d4f79e27aae468');
-
-// Get trending keywords
-const trending = await predifiApi.getTrendingKeywords({ limit: 10 });
 ```
 
-### Using React Hooks
+## Endpoints Covered
+
+### Health & Monitoring
+- `GET /health` → `predifiApi.healthCheck()`
+- `GET /health/websocket` → `predifiApi.websocketHealth()`
+- `GET /api/websocket/stats` → `predifiApi.websocketStats()`
+
+### Markets
+- `GET /api/aggregated` → `predifiApi.listAggregatedMarkets({ venue, category, status, limit, offset })`
+- `GET /api/markets` → `predifiApi.listNativeMarkets({ category, status, limit, offset })`
+
+### Leverage Trading
+- `POST /api/leverage/calculate-liquidation` → `predifiApi.calculateLiquidation({ side, entryPrice, leverage })`
+- `GET /api/leverage/positions?userId=` → `predifiApi.getLeveragePositions(userId)`
+- `POST /api/leverage/positions` → `predifiApi.openLeveragePosition({ userId, marketId, side, margin, leverage })`
+- `POST /api/leverage/positions/:id/close` → `predifiApi.closeLeveragePosition(positionId, userId)`
+
+### Leaderboard & Copy Trading
+- `GET /api/leaderboard` → `predifiApi.getLeaderboard({ sortBy, limit })`
+- `POST /api/leaderboard/copy-trade/create` → `predifiApi.createCopyTrade({ followerId, leaderId, allocationPercentage, maxPositionSize })`
+- `GET /api/leaderboard/copy-trade/list/:address` → `predifiApi.listCopyTrades(address)`
+- `GET /api/leaderboard/copy-trade/:id/executions` → `predifiApi.getCopyTradeExecutions(relationshipId)`
+- `POST /api/leaderboard/copy-trade/:id/pause` → `predifiApi.pauseCopyTrade(relationshipId, userId)`
+- `DELETE /api/leaderboard/copy-trade/:id` → `predifiApi.deleteCopyTrade(relationshipId, userId)`
+
+### Balance
+- `GET /api/balance/:userId` → `predifiApi.getBalance(userId)`
+- `POST /api/balance/lock` → `predifiApi.lockBalance({ userId, amount, refType, refId, reason })`
+- `POST /api/balance/unlock` → `predifiApi.unlockBalance({ userId, refType, refId, reason })`
+
+### Positions
+- `GET /api/positions?userId=&status=` → `predifiApi.getPositions(userId, status)`
+
+### Price Feeds
+- `GET /api/prices/test` → `predifiApi.testPriceFeeds()`
+- `GET /api/prices/:productId` → `predifiApi.getPrice(productId, source)`
+
+### Oracle
+- `GET /api/oracle/:marketId` → `predifiApi.getOracleData(marketId)`
+
+### Withdrawals
+- `POST /api/withdrawals/initiate` → `predifiApi.initiateWithdrawal({ userId, amount, destinationAddress })`
+- `GET /api/withdrawals/:id` → `predifiApi.getWithdrawalStatus(withdrawalId)`
+
+## WebSocket
+
+**URL:** `wss://api.predifi.com`
+
+```typescript
+import { wsService } from '@/services/websocket';
+
+await wsService.connect();
+wsService.subscribeToMarkets(['markets', 'orderbook'], ['predifi-4ab98475']);
+
+wsService.subscribe('market_update', (event) => {
+  console.log(event.yes_price, event.no_price);
+});
+```
+
+**Channels:** `markets`, `orderbook`, `trades`, `positions`
+
+## React Hooks
 
 ```typescript
 import { usePredifiMarkets } from '@/hooks/usePredifiMarkets';
-import { useTrendingKeywords } from '@/hooks/useTrendingKeywords';
 
-function MarketsPage() {
-  const { markets, isLoading, loadMore, pagination } = usePredifiMarkets({
-    status: 'open',
-    category: 'crypto',
-    limit: 50
-  });
-
-  const { keywords } = useTrendingKeywords(10);
-
-  return (
-    <div>
-      {markets.map(market => (
-        <MarketCard key={market.id} market={market} />
-      ))}
-      {pagination.hasMore && (
-        <button onClick={loadMore}>Load More</button>
-      )}
-    </div>
-  );
-}
+const { markets, isLoading, loadMore, pagination } = usePredifiMarkets({
+  status: 'active',
+  venue: 'predifi',
+  limit: 50,
+});
 ```
 
-### WebSocket Integration
+## Response Format
 
-```typescript
-import { useWebSocket } from '@/providers/WebSocketProvider';
-
-function MarketOrderbook({ marketId }) {
-  const { service, isConnected } = useWebSocket();
-
-  useEffect(() => {
-    if (!isConnected) return;
-
-    const unsubscribe = service.subscribe(`market:${marketId}`, (event) => {
-      if (event.type === 'orderbook_update') {
-        setOrderbook(event.data);
-      }
-    });
-
-    return unsubscribe;
-  }, [marketId, isConnected, service]);
-}
-```
-
-## API Response Types
-
-All TypeScript types are available in `src/services/predifi-api.ts`:
-
-- `PredifiMarket` - Complete market object
-- `ListMarketsResponse` - Paginated market list
-- `NativeMarketStatsResponse` - Market statistics
-- `OrderbookResponse` - Order book data
-- `TradesResponse` - Trade history
-- `BestPricesResponse` - Best bid/ask prices
-- `TrendingKeywordsResponse` - Trending keywords
-
-## Rate Limiting
-
-Rate limiting details are managed by the backend. Contact the backend team for specific limits.
-
-## CORS
-
-All API endpoints support cross-origin requests from authorized frontend domains.
-
-## Health Checks
-
-```typescript
-// Market service health
-const health = await predifiApi.healthCheck();
-
-// Vertex service health
-const vertexHealth = await predifiApi.vertexHealthCheck();
-```
-
-## Error Handling
-
-```typescript
-try {
-  const markets = await predifiApi.listMarkets();
-} catch (error) {
-  console.error('API Error:', error);
-  // Handle error appropriately
-}
-```
-
-## Documentation
-
-For complete API documentation, refer to the official Predifi API Reference (v1.1.0).
+All responses follow: `{ success: boolean, ...data }`. Markets use snake_case fields (`yes_price`, `volume_24h`, `image_url`, etc.).

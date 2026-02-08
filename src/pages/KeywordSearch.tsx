@@ -18,7 +18,7 @@ const KeywordSearch = () => {
   const [showClosed, setShowClosed] = useState(false);
   
   const { results, isLoading, error, search } = usePredifiSearch({
-    status: showClosed ? undefined : 'open',
+    status: showClosed ? undefined : 'active',
   });
 
   useEffect(() => {
@@ -28,44 +28,29 @@ const KeywordSearch = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [keyword, showClosed]);
 
-  // Convert Predifi markets to display format with deduplication
   const displayMarkets = useMemo(() => {
-    // First, deduplicate by slug (keep first occurrence)
-    const seenSlugs = new Set<string>();
+    // Deduplicate by id
+    const seenIds = new Set<string>();
     const deduplicated = results.filter(market => {
-      if (seenSlugs.has(market.slug)) {
-        console.warn('⚠️ Duplicate market found:', market.slug, market.title);
-        return false;
-      }
-      seenSlugs.add(market.slug);
+      if (seenIds.has(market.id)) return false;
+      seenIds.add(market.id);
       return true;
     });
 
-    console.log(`🔍 Search returned ${results.length} results, deduplicated to ${deduplicated.length}`);
-
     return deduplicated.map((market, idx) => {
-      const lastPriceYes = market.venues[0]?.metrics.lastPriceYes;
-      const lastPriceNo = market.venues[0]?.metrics.lastPriceNo;
-      
-      const normalizePrice = (price: number | null | undefined) => {
-        if (price == null) return 50;
-        if (price > 1) return Math.round(price);
-        return Math.round(price * 100);
-      };
-      
-      const yesPercentage = normalizePrice(lastPriceYes);
-      const noPercentage = normalizePrice(lastPriceNo);
-      const volumeUSD = (market.aggregateMetrics.volumeTotal || 0) / 1000000;
-      
+      const yesPercentage = Math.round(market.yes_price ?? 50);
+      const noPercentage = Math.round(market.no_price ?? 50);
+      const volumeUSD = (market.volume_total || 0) / 1000000;
+
       return {
         id: market.id,
-        uniqueKey: `${market.slug}-${idx}`, // Use slug for stability
+        uniqueKey: `${market.id}-${idx}`,
         title: market.title,
         yesPercentage,
         noPercentage,
         totalVolume: volumeUSD,
-        venue: market.primaryVenue,
-        imageUrl: market.imageUrl,
+        venue: market.venue?.toUpperCase() ?? 'PREDIFI',
+        imageUrl: market.image_url ?? undefined,
         category: market.category,
       };
     });

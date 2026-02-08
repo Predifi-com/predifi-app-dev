@@ -3,59 +3,49 @@ import type { PredifiMarket } from '@/services/predifi-api';
 import type { MarketItem, MarketGroup, GroupOutcome, NormalizedMarket } from '@/types/market-group';
 
 function normalizeMarket(market: PredifiMarket): NormalizedMarket {
-  const primaryVenueData = market.venues.find(v => v.venue === market.primaryVenue) || market.venues[0];
-  const metrics = primaryVenueData?.metrics;
-
   return {
     id: market.id,
     title: market.title,
     description: market.description,
     category: market.category,
-    tags: market.tags,
-    venue: market.primaryVenue,
+    tags: market.tags ?? [],
+    venue: market.venue?.toUpperCase() ?? 'PREDIFI_NATIVE',
     status: market.status,
-    yesPrice: metrics?.lastPriceYes ?? 50,
-    noPrice: metrics?.lastPriceNo ?? 50,
-    yesPercentage: metrics?.lastPriceYes ?? 50,
-    noPercentage: metrics?.lastPriceNo ?? 50,
-    liquidity: metrics?.liquidity ?? 0,
-    volume24h: metrics?.volume24h ?? 0,
-    totalVolume: metrics?.volumeTotal ?? 0,
-    openInterest: metrics?.openInterest ?? 0,
-    createdAt: market.createdAt,
-    endDate: market.endTime,
-    imageUrl: market.imageUrl,
+    yesPrice: market.yes_price ?? 50,
+    noPrice: market.no_price ?? 50,
+    yesPercentage: market.yes_price ?? 50,
+    noPercentage: market.no_price ?? 50,
+    liquidity: market.liquidity ?? 0,
+    volume24h: market.volume_24h ?? 0,
+    totalVolume: market.volume_total ?? 0,
+    openInterest: market.open_interest ?? 0,
+    createdAt: market.created_at,
+    endDate: market.expires_at,
+    imageUrl: market.image_url ?? undefined,
   };
 }
 
 function transformToMarketGroup(markets: PredifiMarket[], groupId: string): MarketGroup {
   const firstMarket = markets[0];
-  
-  const outcomes: GroupOutcome[] = markets.map((market, index) => {
-    const primaryVenueData = market.venues.find(v => v.venue === market.primaryVenue) || market.venues[0];
-    const metrics = primaryVenueData?.metrics;
-    const yesPrice = metrics?.lastPriceYes ?? 50;
-    const noPrice = metrics?.lastPriceNo ?? 50;
 
-    // Get outcome label from market outcomes or use title
-    const outcomeName = market.outcomes?.[0]?.name || market.title.split('?')[1]?.trim() || `Outcome ${index + 1}`;
+  const outcomes: GroupOutcome[] = markets.map((market, index) => {
+    const outcomeName = market.title.split('?')[1]?.trim() || `Outcome ${index + 1}`;
 
     return {
       outcomeId: market.id,
       label: outcomeName,
       marketId: market.id,
-      yesPrice,
-      noPrice,
-      impliedProbability: yesPrice,
-      liquidity: metrics?.liquidity,
-      volume24h: metrics?.volume24h,
-      provider: market.primaryVenue,
-      status: market.status === 'open' ? 'active' : market.status === 'settled' ? 'settled' : 'suspended',
-      iconUrl: market.imageUrl,
+      yesPrice: market.yes_price ?? 50,
+      noPrice: market.no_price ?? 50,
+      impliedProbability: market.yes_price ?? 50,
+      liquidity: market.liquidity,
+      volume24h: market.volume_24h,
+      provider: market.venue?.toUpperCase() ?? 'PREDIFI_NATIVE',
+      status: market.status === 'active' ? 'active' : market.status === 'resolved' ? 'settled' : 'suspended',
+      iconUrl: market.image_url ?? undefined,
     };
   });
 
-  // Sort by probability descending
   outcomes.sort((a, b) => b.impliedProbability - a.impliedProbability);
 
   return {
@@ -63,20 +53,13 @@ function transformToMarketGroup(markets: PredifiMarket[], groupId: string): Mark
     question: firstMarket.title.split('?')[0] + '?' || firstMarket.title,
     description: firstMarket.description,
     category: firstMarket.category,
-    sport: firstMarket.sport || undefined,
-    imageUrl: firstMarket.imageUrl,
-    totalVolume: markets.reduce((sum, m) => {
-      const venueData = m.venues.find(v => v.venue === m.primaryVenue) || m.venues[0];
-      return sum + (venueData?.metrics?.volumeTotal || 0);
-    }, 0),
-    totalLiquidity: markets.reduce((sum, m) => {
-      const venueData = m.venues.find(v => v.venue === m.primaryVenue) || m.venues[0];
-      return sum + (venueData?.metrics?.liquidity || 0);
-    }, 0),
-    endDate: firstMarket.endTime,
-    status: firstMarket.status === 'open' ? 'active' : firstMarket.status === 'settled' ? 'settled' : 'suspended',
+    imageUrl: firstMarket.image_url ?? undefined,
+    totalVolume: markets.reduce((sum, m) => sum + (m.volume_total || 0), 0),
+    totalLiquidity: markets.reduce((sum, m) => sum + (m.liquidity || 0), 0),
+    endDate: firstMarket.expires_at,
+    status: firstMarket.status === 'active' ? 'active' : firstMarket.status === 'resolved' ? 'settled' : 'suspended',
     outcomes,
-    updatedAt: firstMarket.updatedAt,
+    updatedAt: firstMarket.updated_at,
   };
 }
 
@@ -88,7 +71,6 @@ function generateMockMarketGroups(): MarketItem[] {
   
   const mockGroups: MarketItem[] = [];
 
-  // Small group (2 outcomes) - FIFA World Cup
   const countries2 = ['Germany', 'Spain'];
   mockGroups.push({
     type: 'group',
@@ -117,7 +99,6 @@ function generateMockMarketGroups(): MarketItem[] {
     },
   });
 
-  // Medium group (10 outcomes) - Olympics
   const countries10 = ['Brazil', 'France', 'Argentina', 'England', 'Spain', 'Germany', 'Italy', 'Netherlands', 'Portugal', 'Belgium'];
   mockGroups.push({
     type: 'group',
@@ -145,7 +126,6 @@ function generateMockMarketGroups(): MarketItem[] {
     },
   });
 
-  // Large group (50 outcomes) - Tech Companies
   const companies = [
     'Apple', 'Microsoft', 'Google', 'Amazon', 'Meta', 'Tesla', 'NVIDIA', 'Netflix', 'Adobe', 'Salesforce',
     'Oracle', 'Intel', 'IBM', 'Cisco', 'PayPal', 'AMD', 'Qualcomm', 'Texas Instruments', 'Broadcom', 'Micron',
@@ -181,13 +161,12 @@ function generateMockMarketGroups(): MarketItem[] {
     },
   });
 
-  // NEW: Crypto market - Bitcoin price prediction
   const btcPriceRanges = ['Above $150K', '$120K-$150K', '$100K-$120K', '$80K-$100K', 'Below $80K'];
   mockGroups.push({
     type: 'group',
     group: {
       groupId: 'btc-price-2026',
-      question: 'What will be Bitcoin\'s price at the end of Q2 2026?',
+      question: "What will be Bitcoin's price at the end of Q2 2026?",
       category: 'Crypto',
       imageUrl: 'https://cryptologos.cc/logos/bitcoin-btc-logo.png',
       totalVolume: 8500000,
@@ -210,7 +189,6 @@ function generateMockMarketGroups(): MarketItem[] {
     },
   });
 
-  // NEW: US Elections market
   const candidates = ['Donald Trump', 'Ron DeSantis', 'Kamala Harris', 'Gavin Newsom', 'Nikki Haley', 'Other'];
   mockGroups.push({
     type: 'group',
@@ -238,7 +216,6 @@ function generateMockMarketGroups(): MarketItem[] {
     },
   });
 
-  // NEW: AI/Tech milestone market
   const aiMilestones = ['GPT-5 Release', 'AGI Announcement', 'AI Regulation Passed', 'OpenAI IPO', 'AI Winter Begins'];
   mockGroups.push({
     type: 'group',
@@ -275,9 +252,9 @@ export function useMarketGroups(markets: PredifiMarket[]): MarketItem[] {
     const ungrouped: PredifiMarket[] = [];
     
     markets.forEach(market => {
-      if (market.groupId) {
-        const existing = groupMap.get(market.groupId) || [];
-        groupMap.set(market.groupId, [...existing, market]);
+      if (market.group_id) {
+        const existing = groupMap.get(market.group_id) || [];
+        groupMap.set(market.group_id, [...existing, market]);
       } else {
         ungrouped.push(market);
       }
@@ -307,17 +284,13 @@ export function useMarketGroups(markets: PredifiMarket[]): MarketItem[] {
     });
 
     // TEMPORARY: Inject mock market groups for QA testing
-    // Remove this section once API provides real grouped markets
     const mockGroups = generateMockMarketGroups();
     
-    // Insert mock groups at strategic positions for layout shift testing
-    // Group with 2 outcomes goes at position 1 (between two binary cards)
     if (items.length > 1) {
-      items.splice(1, 0, mockGroups[0]); // 2 outcomes
-      items.splice(5, 0, mockGroups[1]); // 10 outcomes  
-      items.splice(10, 0, mockGroups[2]); // 50 outcomes
+      items.splice(1, 0, mockGroups[0]);
+      items.splice(5, 0, mockGroups[1]);
+      items.splice(10, 0, mockGroups[2]);
     } else {
-      // If not enough markets, just append
       items.push(...mockGroups);
     }
     
