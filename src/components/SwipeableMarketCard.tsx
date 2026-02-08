@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { MessageCircle, TrendingUp, Bell, Bot, Heart, Share2, AlertCircle, Clock } from "lucide-react";
@@ -66,7 +67,7 @@ export function SwipeableMarketCard({
   const [analysisChatOpen, setAnalysisChatOpen] = useState(false);
   const [isFavorited, setIsFavorited] = useState(false);
   const isMobile = useIsMobile();
-  
+  const navigate = useNavigate();
   const displayImage = imageUrl || image;
   const displayVolume = totalVolume !== undefined && totalVolume !== null
     ? formatVolume(totalVolume)
@@ -217,8 +218,8 @@ export function SwipeableMarketCard({
                     </div>
                   )}
                 </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-foreground line-clamp-2 text-lg">{title}</h3>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => navigate(`/markets/${id}`)}>
+                  <h3 className="font-bold text-foreground line-clamp-2 text-lg hover:underline">{title}</h3>
                 </div>
               </div>
 

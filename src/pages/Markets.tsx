@@ -15,9 +15,11 @@ import { MarketCardSkeleton } from "@/components/MarketCardSkeleton";
 import { MarketFiltersSettings } from "@/components/MarketFiltersSettings";
 
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useSearchParams } from "react-router-dom";
+import { Search, X } from "lucide-react";
 import { toast } from "sonner";
 
 const Markets = () => {
@@ -25,6 +27,7 @@ const Markets = () => {
   
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
   const [category, setCategory] = useState<string>(searchParams.get('category') || "all");
   const [venue, setVenue] = useState<string>(searchParams.get('venue') || "all");
   const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || "createdAt_desc");
@@ -46,20 +49,25 @@ const Markets = () => {
   // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams();
+    if (searchQuery) params.set('q', searchQuery);
     if (category && category !== 'all') params.set('category', category);
     if (venue && venue !== 'all') params.set('venue', venue);
     if (sortBy !== 'createdAt_desc') params.set('sort', sortBy);
     if (minVolume) params.set('minVolume', minVolume.toString());
     setSearchParams(params, { replace: true });
-  }, [category, venue, sortBy, minVolume, setSearchParams]);
+  }, [searchQuery, category, venue, sortBy, minVolume, setSearchParams]);
 
   // Parse sort string into field and direction
   const [sortField, sortDir] = sortBy.split('_');
 
   // Filter and transform markets
   const filteredMarkets = useMemo(() => {
+    const query = searchQuery.toLowerCase().trim();
     return markets
       .filter(market => {
+        // Filter by search query
+        if (query && !market.title.toLowerCase().includes(query)) return false;
+        
         // Filter by status
         if (!showClosed && market.status !== 'active') return false;
         
@@ -70,7 +78,7 @@ const Markets = () => {
         
         return true;
       });
-  }, [markets, showClosed, venue]);
+  }, [markets, searchQuery, showClosed, venue]);
 
   // Transform markets into displayable items
   const displayMarkets = useMemo(() => {
@@ -119,8 +127,26 @@ const Markets = () => {
       <Header />
       <CategoryNav />
       
-      {/* Filters Bar */}
+      {/* Search & Filters Bar */}
       <div className="px-4 py-4 border-b border-border">
+        {/* Search Bar */}
+        <div className="relative mb-3 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input
+            placeholder="Search markets..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9 pr-9"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 flex-1">
             <MarketFilters 
