@@ -1,4 +1,4 @@
-import { Bot, MessageCircle } from "lucide-react";
+import { Bot, MessageCircle, Clock, Layers } from "lucide-react";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { MarketExpandedModal } from "./MarketExpandedModal";
@@ -6,25 +6,6 @@ import { MarketAnalysisChat } from "./MarketAnalysisChat";
 import { Sparkline } from "./Sparkline";
 import { useMarketSparkline } from "@/hooks/useMarketSparkline";
 import { getVenueDisplayName } from "@/lib/venue-utils";
-
-// Consistent color palette for multi-outcome segments
-const OUTCOME_COLORS = [
-  "bg-emerald-500",
-  "bg-blue-500",
-  "bg-amber-500",
-  "bg-violet-500",
-  "bg-rose-500",
-  "bg-cyan-500",
-];
-
-const OUTCOME_TEXT_COLORS = [
-  "text-emerald-500",
-  "text-blue-500",
-  "text-amber-500",
-  "text-violet-500",
-  "text-rose-500",
-  "text-cyan-500",
-];
 
 export interface MarketOutcome {
   label: string;
@@ -54,6 +35,25 @@ function formatVolume(volume: number): string {
   return "$0";
 }
 
+function formatTimeLeft(endDate: string): { text: string; urgent: boolean } | null {
+  const now = Date.now();
+  const end = new Date(endDate).getTime();
+  if (isNaN(end)) return null;
+  const diff = end - now;
+  if (diff <= 0) return { text: "Ended", urgent: false };
+
+  const hours = diff / (1000 * 60 * 60);
+  if (hours < 1) {
+    const mins = Math.floor(diff / (1000 * 60));
+    return { text: `${mins}m left`, urgent: true };
+  }
+  if (hours < 24) return { text: `${Math.floor(hours)}h left`, urgent: true };
+  const days = Math.floor(hours / 24);
+  if (days < 30) return { text: `${days}d left`, urgent: false };
+  const months = Math.floor(days / 30);
+  return { text: `${months}mo left`, urgent: false };
+}
+
 export function MinimalMarketCard({
   id,
   title,
@@ -80,31 +80,17 @@ export function MinimalMarketCard({
   const venueLabel = getVenueDisplayName(venue);
   const isMultiOutcome = marketType === "multi_outcome" && outcomes && outcomes.length > 2;
 
-  // Sparkline data
   const { data: sparklineData } = useMarketSparkline(id, venue);
 
-  // For multi-outcome: top 2 + others
-  const displaySegments = useMemo(() => {
+  const timeLeft = useMemo(() => (endDate ? formatTimeLeft(endDate) : null), [endDate]);
+
+  // Multi-outcome: top 2 sorted by probability
+  const topOutcomes = useMemo(() => {
     if (!isMultiOutcome || !outcomes) return [];
-    const sorted = [...outcomes].sort((a, b) => b.probability - a.probability);
-    const top2 = sorted.slice(0, 2);
-    const othersProb = sorted.slice(2).reduce((sum, o) => sum + o.probability, 0);
-    const segments = top2.map((o, i) => ({
-      label: o.label,
-      probability: o.probability,
-      colorClass: OUTCOME_COLORS[i],
-      textColorClass: OUTCOME_TEXT_COLORS[i],
-    }));
-    if (othersProb > 0) {
-      segments.push({
-        label: "Others",
-        probability: Math.round(othersProb),
-        colorClass: "bg-muted-foreground/40",
-        textColorClass: "text-muted-foreground",
-      });
-    }
-    return segments;
+    return [...outcomes].sort((a, b) => b.probability - a.probability).slice(0, 2);
   }, [isMultiOutcome, outcomes]);
+
+  const outcomeCount = outcomes?.length ?? 0;
 
   return (
     <>
@@ -144,32 +130,53 @@ export function MinimalMarketCard({
           </h3>
         </div>
 
-        {/* Probability bar — grows to fill available space */}
+        {/* Expiry countdown */}
+        {timeLeft && (
+          <div className="mb-3 flex-shrink-0">
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+                timeLeft.urgent
+                  ? "bg-red-500/15 text-red-500"
+                  : "bg-muted text-muted-foreground"
+              }`}
+            >
+              <Clock className="w-3 h-3" />
+              {timeLeft.text}
+            </span>
+          </div>
+        )}
+
+        {/* Market type content — fills available space */}
         <div className="mb-3 flex-1 flex flex-col justify-end">
           {isMultiOutcome ? (
-            <>
-              <div className="flex h-7 rounded-lg overflow-hidden">
-                {displaySegments.map((seg, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-center text-xs font-bold text-white ${seg.colorClass} transition-all`}
-                    style={{ width: `${Math.max(seg.probability, 6)}%` }}
+            /* ── Multi-outcome: top outcomes list (NO bar) ── */
+            <div className="space-y-2">
+              {topOutcomes.map((o, i) => (
+                <div key={o.label} className="flex items-center gap-2">
+                  <span
+                    className={`text-sm font-medium truncate flex-1 ${
+                      i === 0 ? "text-foreground" : "text-muted-foreground"
+                    }`}
                   >
-                    {seg.probability >= 15 && `${seg.probability}%`}
-                  </div>
-                ))}
-              </div>
-              <div className="flex gap-3 mt-1.5 text-xs text-muted-foreground flex-wrap">
-                {displaySegments.map((seg, i) => (
-                  <span key={i} className="flex items-center gap-1">
-                    <span className={`inline-block w-2 h-2 rounded-full ${seg.colorClass}`} />
-                    <span className="truncate max-w-[80px]">{seg.label}</span>
-                    <span className={`font-semibold ${seg.textColorClass}`}>{seg.probability}%</span>
+                    {o.label}
                   </span>
-                ))}
+                  <span
+                    className={`text-sm font-bold tabular-nums ${
+                      i === 0 ? "text-emerald-500" : "text-muted-foreground"
+                    }`}
+                  >
+                    {o.probability}%
+                  </span>
+                </div>
+              ))}
+              {/* Outcome count badge */}
+              <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Layers className="w-3 h-3" />
+                <span>{outcomeCount} outcomes</span>
               </div>
-            </>
+            </div>
           ) : (
+            /* ── Binary: YES/NO bar ── */
             <>
               <div className="flex h-7 rounded-lg overflow-hidden">
                 <div
@@ -197,21 +204,20 @@ export function MinimalMarketCard({
           )}
         </div>
 
-        {/* Sparkline — compact, informational only */}
+        {/* Sparkline */}
         {sparklineData && sparklineData.length >= 2 && (
           <div className="mb-3 flex-shrink-0">
             <Sparkline data={sparklineData} width={200} height={20} strokeWidth={1.5} />
           </div>
         )}
 
-        {/* Fixed footer: venue + volume — always pinned at bottom */}
+        {/* Fixed footer: venue + volume */}
         <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border mt-auto flex-shrink-0">
           <span className="font-medium">{venueLabel}</span>
           <span className="font-semibold text-foreground/70">{displayVolume}</span>
         </div>
       </motion.div>
 
-      {/* Expanded Modal */}
       <MarketExpandedModal
         open={modalOpen}
         onOpenChange={setModalOpen}
@@ -230,7 +236,6 @@ export function MinimalMarketCard({
         }}
       />
 
-      {/* AI Chat */}
       <MarketAnalysisChat
         open={aiChatOpen}
         onClose={() => setAiChatOpen(false)}
