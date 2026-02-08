@@ -1,5 +1,6 @@
 import { MarketGroupCard } from '@/components/MarketGroupCard';
 import { MinimalMarketCard } from '@/components/MinimalMarketCard';
+import type { MarketOutcome } from '@/components/MinimalMarketCard';
 import type { MarketItem } from '@/types/market-group';
 
 interface MarketCardWrapperProps {
@@ -13,6 +14,11 @@ export function MarketCardWrapper({ item, animationsEnabled = true }: MarketCard
   }
 
   const m = item.market;
+
+  // Detect multi-outcome: if the market has an outcomes array with 3+ items
+  const isMulti = (m as any).outcomes && (m as any).outcomes.length > 2;
+  const outcomes: MarketOutcome[] | undefined = isMulti ? (m as any).outcomes : undefined;
+
   return (
     <MinimalMarketCard
       id={m.id}
@@ -25,6 +31,8 @@ export function MarketCardWrapper({ item, animationsEnabled = true }: MarketCard
       imageUrl={m.imageUrl}
       endDate={m.endDate}
       animationsEnabled={animationsEnabled}
+      marketType={isMulti ? "multi_outcome" : "binary"}
+      outcomes={outcomes}
     />
   );
 }

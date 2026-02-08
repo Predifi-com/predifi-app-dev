@@ -33,6 +33,11 @@ export interface MarketGroup {
 export type OutcomeSortField = 'probability' | 'alphabetical' | 'liquidity' | 'volume';
 export type SortDirection = 'asc' | 'desc';
 
+export interface NormalizedMarketOutcome {
+  label: string;
+  probability: number;
+}
+
 export interface NormalizedMarket {
   id: string;
   title: string;
@@ -52,6 +57,8 @@ export interface NormalizedMarket {
   createdAt: string;
   endDate: string;
   imageUrl?: string;
+  marketType?: 'binary' | 'multi_outcome';
+  outcomes?: NormalizedMarketOutcome[];
 }
 
 export type MarketItem = 

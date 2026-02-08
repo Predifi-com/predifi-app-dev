@@ -82,28 +82,38 @@ const Markets = () => {
 
   // Transform markets into displayable items
   const displayMarkets = useMemo(() => {
-    return filteredMarkets.map(market => ({
-      type: 'binary' as const,
-      market: {
-        id: market.id,
-        title: market.title,
-        description: market.description || '',
-        yesPrice: (market.yes_price ?? 50) / 100,
-        noPrice: (market.no_price ?? 50) / 100,
-        yesPercentage: market.yes_price ?? 50,
-        noPercentage: market.no_price ?? 50,
-        totalVolume: market.volume_total ?? 0,
-        liquidity: market.liquidity ?? 0,
-        volume24h: market.volume_24h ?? 0,
-        openInterest: market.open_interest ?? 0,
-        endDate: market.resolution_date || market.expires_at || '',
-        imageUrl: market.image_url || '',
-        status: market.status,
-        venue: market.venue || 'predifi',
-        category: market.category || '',
-        createdAt: market.created_at || '',
-      }
-    }));
+    return filteredMarkets.map(market => {
+      // Detect multi-outcome from API data
+      const apiOutcomes = (market as any).outcomes;
+      const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length > 2;
+
+      return {
+        type: 'binary' as const,
+        market: {
+          id: market.id,
+          title: market.title,
+          description: market.description || '',
+          yesPrice: (market.yes_price ?? 50) / 100,
+          noPrice: (market.no_price ?? 50) / 100,
+          yesPercentage: market.yes_price ?? 50,
+          noPercentage: market.no_price ?? 50,
+          totalVolume: market.volume_total ?? 0,
+          liquidity: market.liquidity ?? 0,
+          volume24h: market.volume_24h ?? 0,
+          openInterest: market.open_interest ?? 0,
+          endDate: market.resolution_date || market.expires_at || '',
+          imageUrl: market.image_url || '',
+          status: market.status,
+          venue: market.venue || 'predifi',
+          category: market.category || '',
+          createdAt: market.created_at || '',
+          marketType: isMulti ? 'multi_outcome' as const : 'binary' as const,
+          outcomes: isMulti
+            ? apiOutcomes.map((o: any) => ({ label: o.label || o.name, probability: o.probability ?? o.price ?? 0 }))
+            : undefined,
+        }
+      };
+    });
   }, [filteredMarkets]);
 
   // Refresh handler
