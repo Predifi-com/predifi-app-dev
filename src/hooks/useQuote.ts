@@ -20,7 +20,7 @@ export const useQuote = (): UseQuoteResult => {
 
     try {
       const quoteData = await apiService.getQuote(request);
-      setQuote(quoteData);
+      setQuote(quoteData as unknown as QuoteResponse);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to get quote"));
       console.error("Error getting quote:", err);
@@ -30,10 +30,5 @@ export const useQuote = (): UseQuoteResult => {
     }
   }, []);
 
-  return {
-    quote,
-    isLoading,
-    error,
-    getQuote,
-  };
+  return { quote, isLoading, error, getQuote };
 };

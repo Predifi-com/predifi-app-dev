@@ -8,55 +8,20 @@ import { AIModelLeaderboard } from "@/components/AIModelLeaderboard";
 import { FollowTraderModal } from "@/components/FollowTraderModal";
 import { Button } from "@/components/ui/button";
 import { UserPlus } from "lucide-react";
-import { useState, useEffect } from "react";
-
-interface Trader {
-  rank: number;
-  user_address: string;
-  total_pnl: number;
-  total_trades: number;
-  win_rate: number;
-  total_volume: number;
-}
+import { useState } from "react";
+import { useLeaderboard } from "@/hooks/useLeaderboard";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import type { LeaderboardEntry } from "@/services/predifi-api";
 
 const Leaderboard = () => {
-  const [topTraders, setTopTraders] = useState<Trader[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
-  const [stats, setStats] = useState({ totalVolume: 0, activeTraders: 0, totalMarkets: 0 });
+  const [sortBy, setSortBy] = useState<'pnl' | 'roi' | 'winRate'>('pnl');
+  const { traders, isLoading, error } = useLeaderboard({ sortBy, limit: 20 });
+
   const [followModalOpen, setFollowModalOpen] = useState(false);
-  const [selectedTrader, setSelectedTrader] = useState<Trader | null>(null);
+  const [selectedTrader, setSelectedTrader] = useState<LeaderboardEntry | null>(null);
 
-  useEffect(() => {
-    fetchLeaderboard();
-  }, []);
-
-  const fetchLeaderboard = async () => {
-    try {
-      const response = await fetch('/api/leaderboard?limit=20');
-      const data = await response.json();
-      
-      if (data.success) {
-        setTopTraders(data.leaderboard);
-        setStats({
-          totalVolume: data.stats?.totalVolume || 0,
-          activeTraders: data.stats?.activeTraders || 0,
-          totalMarkets: data.stats?.totalMarkets || 0
-        });
-      } else {
-        setError('Failed to load leaderboard');
-      }
-    } catch (err) {
-      console.error('Leaderboard error:', err);
-      setError('Failed to connect to server');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const shortenAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
+  const shortenAddress = (address: string) =>
+    `${address.slice(0, 6)}...${address.slice(-4)}`;
 
   const formatProfit = (pnl: number) => {
     const sign = pnl >= 0 ? '+' : '';
@@ -79,8 +44,7 @@ const Leaderboard = () => {
       <Header />
       
       <div className="px-4 py-8 max-w-5xl mx-auto">
-        {/* Development Banner - Remove when live */}
-        {loading && (
+        {isLoading && (
           <div className="mb-6 py-3 px-4 bg-muted border border-border rounded-md">
             <p className="text-xs text-center text-muted-foreground uppercase tracking-wide">
               Loading leaderboard...
@@ -91,52 +55,24 @@ const Leaderboard = () => {
         {error && (
           <div className="mb-6 py-3 px-4 bg-destructive/10 border border-destructive rounded-md">
             <p className="text-xs text-center text-destructive uppercase tracking-wide">
-              {error}
+              {error.message}
             </p>
           </div>
         )}
 
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-foreground mb-1">Leaderboard</h1>
-          <p className="text-sm text-muted-foreground">Top traders on Predifi</p>
-        </div>
-
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          <Card className="p-4 border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                <Trophy className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Volume</p>
-                <p className="text-xl font-semibold text-foreground">${(stats.totalVolume / 1000000).toFixed(1)}M</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                <TrendingUp className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Active Traders</p>
-                <p className="text-xl font-semibold text-foreground">{stats.activeTraders.toLocaleString()}</p>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4 border border-border">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center">
-                <Coins className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground uppercase tracking-wide">Total Markets</p>
-                <p className="text-xl font-semibold text-foreground">{stats.totalMarkets.toLocaleString()}</p>
-              </div>
-            </div>
-          </Card>
+        {/* Header + Sort */}
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className="text-2xl font-semibold text-foreground mb-1">Leaderboard</h1>
+            <p className="text-sm text-muted-foreground">Top traders on Predifi</p>
+          </div>
+          <Tabs value={sortBy} onValueChange={(v) => setSortBy(v as typeof sortBy)}>
+            <TabsList>
+              <TabsTrigger value="pnl">P&L</TabsTrigger>
+              <TabsTrigger value="roi">ROI</TabsTrigger>
+              <TabsTrigger value="winRate">Win Rate</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
         {/* AI Model Leaderboard */}
@@ -162,51 +98,48 @@ const Leaderboard = () => {
 
           {/* Table Body */}
           <div className="divide-y divide-border">
-            {topTraders.map((trader) => {
+            {traders.map((trader) => {
               const rankDisplay = getRankDisplay(trader.rank);
               const avatarEmoji = ['👑', '🎯', '⚡', '🔮', '🧠', '🎲', '👁️', '📈', '💎', '🚀'][trader.rank - 1] || '🌟';
               
               return (
                 <div
-                  key={trader.user_address}
+                  key={trader.user_id}
                   className="grid grid-cols-12 gap-4 px-4 py-4 items-center hover:bg-muted/30 transition-colors duration-150"
                 >
-                  {/* Rank */}
                   <div className="col-span-1 flex justify-center">
                     {rankDisplay.icon}
                   </div>
 
-                  {/* Trader Info */}
                   <div className="col-span-3 flex items-center gap-3">
                     <div className="w-10 h-10 rounded-md bg-muted flex items-center justify-center text-lg">
                       {avatarEmoji}
                     </div>
                     <div>
-                      <p className="font-medium text-foreground text-sm font-mono">{shortenAddress(trader.user_address)}</p>
-                      <p className="text-xs text-muted-foreground md:hidden">{trader.total_trades} trades</p>
+                      <p className="font-medium text-foreground text-sm font-mono">{shortenAddress(trader.user_id)}</p>
+                      <div className="flex items-center gap-1 md:hidden">
+                        <span className="text-xs text-muted-foreground">{trader.total_trades} trades</span>
+                        {trader.badge && <Badge variant="secondary" className="text-[10px]">{trader.badge}</Badge>}
+                      </div>
                     </div>
                   </div>
 
-                  {/* Trades */}
                   <div className="hidden md:block col-span-2 text-right">
                     <span className="text-sm text-muted-foreground">{trader.total_trades}</span>
                   </div>
 
-                  {/* Profit */}
                   <div className="col-span-2 text-right">
                     <span className={`text-sm font-medium ${trader.total_pnl >= 0 ? 'text-success' : 'text-destructive'}`}>
                       {formatProfit(trader.total_pnl)}
                     </span>
                   </div>
 
-                  {/* Win Rate */}
                   <div className="col-span-2 text-right">
                     <Badge variant="secondary" className="text-xs font-medium">
                       {trader.win_rate.toFixed(1)}%
                     </Badge>
                   </div>
 
-                  {/* Follow Button */}
                   <div className="col-span-2 flex justify-center">
                     <Button
                       size="sm"
@@ -225,7 +158,7 @@ const Leaderboard = () => {
               );
             })}
             
-            {topTraders.length === 0 && !loading && (
+            {traders.length === 0 && !isLoading && (
               <div className="px-4 py-8 text-center text-muted-foreground">
                 No traders found. Start trading to appear on the leaderboard!
               </div>
@@ -236,12 +169,11 @@ const Leaderboard = () => {
 
       <Footer />
 
-      {/* Follow Trader Modal */}
       {selectedTrader && (
         <FollowTraderModal
           open={followModalOpen}
           onOpenChange={setFollowModalOpen}
-          traderAddress={selectedTrader.user_address}
+          traderAddress={selectedTrader.user_id}
           traderStats={{
             winRate: selectedTrader.win_rate,
             totalPnl: selectedTrader.total_pnl,
