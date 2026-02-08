@@ -17,6 +17,7 @@ import {
 import { usePortfolio } from "@/hooks/usePortfolio";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { toast } from "sonner";
+import { CopyTradeDashboard } from "@/components/CopyTradeDashboard";
 
 const Portfolio = () => {
   // Mock user address - replace with actual connected wallet
@@ -99,6 +100,7 @@ const Portfolio = () => {
             <TabsTrigger value="positions">Active Positions</TabsTrigger>
             <TabsTrigger value="history">Trade History</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger value="copy-trading">Copy Trading</TabsTrigger>
           </TabsList>
 
           {/* Active Positions */}
@@ -275,6 +277,11 @@ const Portfolio = () => {
                 </div>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Copy Trading */}
+          <TabsContent value="copy-trading">
+            <CopyTradeDashboard />
           </TabsContent>
         </Tabs>
       </div>

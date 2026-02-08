@@ -49,23 +49,34 @@ export function FollowTraderModal({
     setError('');
 
     try {
-      // Step 1: Create signature message
-      const message = `Follow Trader\n\nTrader: ${traderAddress}\nAllocation: $${allocationAmount}\nMax Position: $${maxPositionSize || 'No limit'}\nTimestamp: ${Date.now()}`;
+      // Calculate copy ratio (10% of balance)
+      const copyRatio = 0.1; // TODO: Make this configurable
+      
+      // Step 1: Create signature message (matches backend format)
+      const message = `I authorize copy trading from ${traderAddress}.
+Mode: ratio (${copyRatio * 100}% of balance)
+Follower: ${address}
+Timestamp: ${Date.now()}`;
       
       // Step 2: Sign the message
       const signature = await signMessageAsync({ account: address, message });
 
       // Step 3: Submit to backend
-      const response = await fetch('/api/copy-trade/follow', {
+      const response = await fetch('/api/leaderboard/copy-trade/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          followerAddress: address,
-          leaderAddress: traderAddress,
-          allocationAmount: parseFloat(allocationAmount),
-          maxPositionSize: maxPositionSize ? parseFloat(maxPositionSize) : null,
+          followerId: address,
+          leaderId: traderAddress,
+          copyMode: 'ratio',
+          copyRatio: copyRatio,
+          maxPerTrade: maxPositionSize ? parseFloat(maxPositionSize) : undefined,
+          copyLeverage: true,
+          defaultLeverage: 2,
+          maxDailyTrades: 10,
+          stopLossPercent: 20,
           signature,
-          message
+          signatureMessage: message
         })
       });
 
