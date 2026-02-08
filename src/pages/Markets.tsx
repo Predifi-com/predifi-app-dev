@@ -77,6 +77,45 @@ const Markets = () => {
       });
   }, [markets, searchQuery, showClosed, venue]);
 
+  /**
+   * Given an array of similar titles, extract the unique differentiating segment from each.
+   * e.g. ["Will Trump nominate Judy Shelton as...", "Will Trump nominate Kevin Warsh as..."]
+   *   → ["Judy Shelton", "Kevin Warsh"]
+   */
+  function extractUniqueSegments(titles: string[]): string[] {
+    if (titles.length <= 1) return titles;
+    
+    // Find common prefix
+    let prefix = '';
+    const first = titles[0];
+    for (let i = 0; i < first.length; i++) {
+      const char = first[i];
+      if (titles.every(t => t[i] === char)) {
+        prefix += char;
+      } else break;
+    }
+
+    // Find common suffix
+    let suffix = '';
+    const reversed = titles.map(t => t.split('').reverse().join(''));
+    const firstRev = reversed[0];
+    for (let i = 0; i < firstRev.length; i++) {
+      const char = firstRev[i];
+      if (reversed.every(t => t[i] === char)) {
+        suffix = char + suffix;
+      } else break;
+    }
+
+    const results = titles.map(t => {
+      let segment = t.slice(prefix.length, suffix.length ? -suffix.length : undefined).trim();
+      // Clean up leading/trailing punctuation
+      segment = segment.replace(/^[,\s?]+|[,\s?]+$/g, '').trim();
+      return segment || t; // fallback to full title if empty
+    });
+
+    return results;
+  }
+
   // Group markets by group_id and transform into displayable items
   const displayMarkets = useMemo(() => {
     // Step 1: Separate grouped and ungrouped markets
@@ -111,11 +150,13 @@ const Markets = () => {
       const first = groupMarkets[0];
       const totalVol = groupMarkets.reduce((s, m) => s + (m.volume_total || m.volume_24h || 0), 0);
       
-      // Extract outcome labels: use group_item_title if available, otherwise derive from title
-      const outcomes = groupMarkets.map(m => {
-        const label = (m as any).group_item_title || m.title;
-        return { label, probability: m.yes_price ?? 50 };
-      });
+      // Extract short outcome labels from titles
+      const rawLabels = groupMarkets.map(m => (m as any).group_item_title || m.title);
+      const shortLabels = extractUniqueSegments(rawLabels);
+      const outcomes = groupMarkets.map((m, i) => ({
+        label: shortLabels[i],
+        probability: m.yes_price ?? 50,
+      }));
 
       items.push({
         type: 'multi_outcome',
