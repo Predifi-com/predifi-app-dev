@@ -2,15 +2,11 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { predifiApi, type PredifiMarket, type ListMarketsResponse } from "@/services/predifi-api";
 
 interface UsePredifiMarketsParams {
-  status?: 'open' | 'closed' | 'settled' | 'cancelled';
-  venue?: 'POLYMARKET' | 'KALSHI' | 'LIMITLESS' | 'PREDIFI_NATIVE';
+  venue?: 'limitless' | 'polymarket' | 'predifi';
   category?: string;
+  status?: 'active' | 'resolved' | 'expired';
   limit?: number;
   offset?: number;
-  sort_by?: string;
-  sort_dir?: 'asc' | 'desc';
-  min_volume?: number;
-  min_liquidity?: number;
   autoLoad?: boolean;
 }
 
@@ -32,15 +28,11 @@ export const usePredifiMarkets = (params?: UsePredifiMarketsParams): UsePredifiM
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const [offset, setOffset] = useState(0);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    hasMore: false,
-  });
+  const [total, setTotal] = useState(0);
 
   const limit = params?.limit || 50;
   const autoLoad = params?.autoLoad !== false;
 
-  // Use ref to store latest params without causing re-renders
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
@@ -49,30 +41,23 @@ export const usePredifiMarkets = (params?: UsePredifiMarketsParams): UsePredifiM
     setError(null);
 
     try {
-      const currentParams = paramsRef.current;
-      const response: ListMarketsResponse = await predifiApi.listMarkets({
-        status: currentParams?.status,
-        venue: currentParams?.venue,
-        category: currentParams?.category,
+      const p = paramsRef.current;
+      // Use aggregated endpoint (multi-venue) by default; filter by venue if specified
+      const response: ListMarketsResponse = await predifiApi.listAggregatedMarkets({
+        venue: p?.venue,
+        category: p?.category,
+        status: p?.status,
         limit,
         offset: currentOffset,
-        sort_by: currentParams?.sort_by,
-        sort_dir: currentParams?.sort_dir,
-        min_volume: currentParams?.min_volume,
-        min_liquidity: currentParams?.min_liquidity,
       });
 
       if (append) {
-        setMarkets(prev => [...prev, ...response.data]);
+        setMarkets(prev => [...prev, ...response.markets]);
       } else {
-        setMarkets(response.data);
+        setMarkets(response.markets);
       }
 
-      setPagination({
-        total: response.pagination.total,
-        hasMore: response.pagination.hasMore,
-      });
-      
+      setTotal(response.total);
       setOffset(currentOffset);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch markets"));
@@ -82,33 +67,30 @@ export const usePredifiMarkets = (params?: UsePredifiMarketsParams): UsePredifiM
     }
   }, [limit]);
 
+  const hasMore = offset + limit < total;
+
   const loadMore = useCallback(async () => {
-    if (pagination.hasMore && !isLoading) {
+    if (hasMore && !isLoading) {
       await fetchMarkets(offset + limit, true);
     }
-  }, [pagination.hasMore, isLoading, offset, limit, fetchMarkets]);
+  }, [hasMore, isLoading, offset, limit, fetchMarkets]);
 
   const refresh = useCallback(async () => {
     await fetchMarkets(0, false);
   }, [fetchMarkets]);
 
-  // Auto-fetch when params change (but keep stable function reference)
   useEffect(() => {
     if (autoLoad) {
       fetchMarkets(0, false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoLoad, params?.status, params?.venue, params?.category, params?.sort_by, params?.sort_dir, params?.min_volume, params?.min_liquidity]);
+  }, [autoLoad, params?.venue, params?.category, params?.status]);
 
   return {
     markets,
     isLoading,
     error,
-    pagination: {
-      total: pagination.total,
-      hasMore: pagination.hasMore,
-      offset,
-    },
+    pagination: { total, hasMore, offset },
     loadMore,
     refresh,
   };

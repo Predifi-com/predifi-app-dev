@@ -20,20 +20,17 @@ export const MarketSearch = ({ open, onClose }: MarketSearchProps) => {
   const [debouncedQuery, setDebouncedQuery] = useState("");
   
   const { results, isLoading, search, clear } = usePredifiSearch({
-    status: showClosed ? undefined : 'open',
+    status: showClosed ? undefined : 'active',
     limit: 20,
   });
 
-  // Debounce query input
   useEffect(() => {
     const debounce = setTimeout(() => {
       setDebouncedQuery(query);
     }, 300);
-
     return () => clearTimeout(debounce);
   }, [query]);
 
-  // Trigger search only when debounced query changes
   useEffect(() => {
     if (debouncedQuery.trim()) {
       search(debouncedQuery);
@@ -43,22 +40,12 @@ export const MarketSearch = ({ open, onClose }: MarketSearchProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedQuery, showClosed]);
 
-  // Convert Predifi markets to display format with stable keys
   const displayResults = useMemo(() => 
     results.slice(0, 9).map((market, idx) => {
-      const lastPriceYes = market.venues[0]?.metrics.lastPriceYes;
-      const lastPriceNo = market.venues[0]?.metrics.lastPriceNo;
-      
-      const normalizePrice = (price: number | null | undefined) => {
-        if (price == null) return 50;
-        if (price > 1) return Math.round(price);
-        return Math.round(price * 100);
-      };
-      
-      const yesPercentage = normalizePrice(lastPriceYes);
-      const noPercentage = normalizePrice(lastPriceNo);
-      const volumeUSD = (market.aggregateMetrics.volumeTotal || 0) / 1000000;
-      
+      const yesPercentage = Math.round(market.yes_price ?? 50);
+      const noPercentage = Math.round(market.no_price ?? 50);
+      const volumeUSD = (market.volume_total || 0) / 1000000;
+
       return {
         id: market.id,
         stableKey: `${market.id}-${market.status}-${idx}`,
@@ -66,8 +53,8 @@ export const MarketSearch = ({ open, onClose }: MarketSearchProps) => {
         yesPercentage,
         noPercentage,
         totalVolume: volumeUSD,
-        venue: market.primaryVenue,
-        imageUrl: market.imageUrl,
+        venue: market.venue?.toUpperCase() ?? 'PREDIFI',
+        imageUrl: market.image_url ?? undefined,
         category: market.category,
       };
     }), [results]);

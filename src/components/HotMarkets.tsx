@@ -6,33 +6,18 @@ import { Flame } from "lucide-react";
 import { useMemo } from "react";
 
 export const HotMarkets = () => {
-  // Fetch more markets and sort client-side to ensure we get the actual highest volume
   const { markets, isLoading } = usePredifiMarkets({
-    status: 'open',
+    status: 'active',
     limit: 50,
-    sort_by: 'volumeTotal',
-    sort_dir: 'desc',
     autoLoad: true,
   });
 
   const displayMarkets = useMemo(() => {
-    // Normalize all markets first
     const normalized = markets.map((market, idx) => {
-      const lastPriceYes = market.venues[0]?.metrics.lastPriceYes;
-      const lastPriceNo = market.venues[0]?.metrics.lastPriceNo;
-      
-      const normalizePrice = (price: number | null | undefined) => {
-        if (price == null) return 50;
-        if (price > 1) return Math.round(price);
-        return Math.round(price * 100);
-      };
-      
-      const yesPercentage = normalizePrice(lastPriceYes);
-      const noPercentage = normalizePrice(lastPriceNo);
-      
-      // Volume comes in raw units, divide by 1000000 for USD
-      const volumeUSD = (market.aggregateMetrics.volumeTotal || 0) / 1000000;
-      
+      const yesPercentage = Math.round(market.yes_price ?? 50);
+      const noPercentage = Math.round(market.no_price ?? 50);
+      const volumeUSD = (market.volume_total || 0) / 1000000;
+
       return {
         id: market.id,
         uniqueKey: `hot-${market.id}-${idx}`,
@@ -40,13 +25,12 @@ export const HotMarkets = () => {
         yesPercentage,
         noPercentage,
         totalVolume: volumeUSD,
-        venue: market.primaryVenue,
-        imageUrl: market.imageUrl,
+        venue: market.venue?.toUpperCase() ?? 'PREDIFI',
+        imageUrl: market.image_url ?? undefined,
         category: market.category,
       };
     });
-    
-    // Sort by volume descending and take top 6
+
     return normalized
       .sort((a, b) => b.totalVolume - a.totalVolume)
       .slice(0, 6);

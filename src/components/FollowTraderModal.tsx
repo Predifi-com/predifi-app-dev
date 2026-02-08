@@ -49,38 +49,21 @@ export function FollowTraderModal({
     setError('');
 
     try {
-      // Calculate copy ratio (10% of balance)
-      const copyRatio = 0.1; // TODO: Make this configurable
-      
-      // Step 1: Create signature message (matches backend format)
-      const message = `I authorize copy trading from ${traderAddress}.
-Mode: ratio (${copyRatio * 100}% of balance)
-Follower: ${address}
-Timestamp: ${Date.now()}`;
-      
-      // Step 2: Sign the message
+      const allocationPct = parseFloat(allocationAmount);
+      const maxPos = maxPositionSize ? parseFloat(maxPositionSize) : 500;
+
+      // Step 1: Sign authorization message
+      const message = `I authorize copy trading from ${traderAddress}.\nAllocation: ${allocationPct}%\nFollower: ${address}\nTimestamp: ${Date.now()}`;
       const signature = await signMessageAsync({ account: address, message });
 
-      // Step 3: Submit to backend
-      const response = await fetch('/api/leaderboard/copy-trade/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          followerId: address,
-          leaderId: traderAddress,
-          copyMode: 'ratio',
-          copyRatio: copyRatio,
-          maxPerTrade: maxPositionSize ? parseFloat(maxPositionSize) : undefined,
-          copyLeverage: true,
-          defaultLeverage: 2,
-          maxDailyTrades: 10,
-          stopLossPercent: 20,
-          signature,
-          signatureMessage: message
-        })
+      // Step 2: Submit to Predifi v2 copy-trade API
+      const { predifiApi } = await import('@/services/predifi-api');
+      const data = await predifiApi.createCopyTrade({
+        followerId: address,
+        leaderId: traderAddress,
+        allocationPercentage: allocationPct,
+        maxPositionSize: maxPos,
       });
-
-      const data = await response.json();
 
       if (data.success) {
         setSuccess(true);
@@ -91,7 +74,7 @@ Timestamp: ${Date.now()}`;
           setMaxPositionSize('');
         }, 2000);
       } else {
-        setError(data.error || 'Failed to follow trader');
+        setError('Failed to follow trader');
       }
     } catch (err: any) {
       console.error('Follow trader error:', err);

@@ -1,6 +1,5 @@
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import { SwipeableMarketCard } from "@/components/SwipeableMarketCard";
 import { SEO } from "@/components/SEO";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { usePredifiMarkets } from "@/hooks/usePredifiMarkets";
@@ -9,19 +8,19 @@ import { useMarketGroups } from "@/hooks/useMarketGroups";
 import { Archive, Clock } from "lucide-react";
 
 const ArchivedMarkets = () => {
-  // Fetch markets that are closed/resolved
   const { markets, isLoading } = usePredifiMarkets({
-    status: 'closed',
+    status: 'resolved',
     limit: 50,
     autoLoad: true,
   });
 
-  // Filter to show only markets that expired in the last 24 hours
+  // Filter to show only markets that resolved in the last 24 hours
   const last24Hours = Date.now() - 24 * 60 * 60 * 1000;
   const recentlyExpiredMarkets = markets.filter((market) => {
-    if (!market.endTime) return false;
-    const endTime = new Date(market.endTime).getTime();
-    return endTime >= last24Hours && endTime <= Date.now();
+    const resolvedAt = market.resolved_at || market.updated_at;
+    if (!resolvedAt) return false;
+    const time = new Date(resolvedAt).getTime();
+    return time >= last24Hours && time <= Date.now();
   });
 
   const marketItems = useMarketGroups(recentlyExpiredMarkets);

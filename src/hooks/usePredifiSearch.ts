@@ -1,9 +1,9 @@
 import { useState, useCallback, useRef } from "react";
-import { predifiApi, type PredifiMarket } from "@/services/predifi-api";
+import { predifiApi, type PredifiMarket, type ListMarketsResponse } from "@/services/predifi-api";
 
 interface UsePredifiSearchParams {
-  status?: 'open' | 'closed' | 'settled' | 'cancelled';
-  venue?: 'POLYMARKET' | 'KALSHI' | 'LIMITLESS' | 'PREDIFI_NATIVE';
+  status?: 'active' | 'resolved' | 'expired';
+  venue?: 'limitless' | 'polymarket' | 'predifi';
   category?: string;
   limit?: number;
 }
@@ -16,12 +16,15 @@ interface UsePredifiSearchResult {
   clear: () => void;
 }
 
+/**
+ * Search hook that uses the aggregated markets endpoint with client-side title filtering.
+ * The v2 API doesn't have a dedicated search endpoint, so we fetch and filter.
+ */
 export const usePredifiSearch = (params?: UsePredifiSearchParams): UsePredifiSearchResult => {
   const [results, setResults] = useState<PredifiMarket[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
 
-  // Use ref to store latest params without causing re-renders
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
@@ -36,24 +39,24 @@ export const usePredifiSearch = (params?: UsePredifiSearchParams): UsePredifiSea
 
     try {
       const currentParams = paramsRef.current;
-      console.log('🔍 Search params:', { query, ...currentParams });
-      
-      const response = await predifiApi.searchMarkets({
-        q: query,
-        ...currentParams,
+      // Fetch a larger set and filter client-side by title/description
+      const response: ListMarketsResponse = await predifiApi.listAggregatedMarkets({
+        venue: currentParams?.venue,
+        category: currentParams?.category,
+        status: currentParams?.status,
+        limit: 200,
+        offset: 0,
       });
-      
-      console.log('📊 Search results:', { 
-        total: response.data.length,
-        firstFew: response.data.slice(0, 3).map(m => ({ 
-          id: m.id, 
-          slug: m.slug, 
-          status: m.status,
-          title: m.title.substring(0, 50)
-        }))
-      });
-      
-      setResults(response.data);
+
+      const q = query.toLowerCase();
+      const filtered = response.markets.filter(m =>
+        m.title.toLowerCase().includes(q) ||
+        m.description?.toLowerCase().includes(q) ||
+        m.category?.toLowerCase().includes(q)
+      );
+
+      const limited = currentParams?.limit ? filtered.slice(0, currentParams.limit) : filtered;
+      setResults(limited);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Search failed"));
       console.error("Error searching markets:", err);
@@ -61,18 +64,12 @@ export const usePredifiSearch = (params?: UsePredifiSearchParams): UsePredifiSea
     } finally {
       setIsLoading(false);
     }
-  }, []); // No dependencies - stable function reference
+  }, []);
 
   const clear = useCallback(() => {
     setResults([]);
     setError(null);
   }, []);
 
-  return {
-    results,
-    isLoading,
-    error,
-    search,
-    clear,
-  };
+  return { results, isLoading, error, search, clear };
 };

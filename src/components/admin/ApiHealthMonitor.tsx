@@ -13,9 +13,8 @@ interface ServiceStatus {
 
 export function ApiHealthMonitor() {
   const [services, setServices] = useState<ServiceStatus[]>([
-    { name: "Market Service", status: "ok" },
+    { name: "Backend API", status: "ok" },
     { name: "WebSocket Service", status: "ok" },
-    { name: "Vertex Service", status: "ok" },
   ]);
   const [isChecking, setIsChecking] = useState(false);
 
@@ -23,18 +22,18 @@ export function ApiHealthMonitor() {
     setIsChecking(true);
     const newStatuses: ServiceStatus[] = [];
 
-    // Check Market Service
+    // Check Backend API
     try {
-      const marketHealth = await predifiApi.healthCheck();
+      const health = await predifiApi.healthCheck();
       newStatuses.push({
-        name: "Market Service",
-        status: marketHealth.status === "ok" ? "ok" : "degraded",
+        name: "Backend API",
+        status: health.status === "ok" ? "ok" : "degraded",
         lastChecked: new Date().toLocaleTimeString(),
-        details: marketHealth.services,
+        details: { service: health.service },
       });
-    } catch (error) {
+    } catch {
       newStatuses.push({
-        name: "Market Service",
+        name: "Backend API",
         status: "error",
         lastChecked: new Date().toLocaleTimeString(),
       });
@@ -42,38 +41,19 @@ export function ApiHealthMonitor() {
 
     // Check WebSocket Service
     try {
-      const wsHealth = await fetch(
-        "https://predifi-ws-service-395321861753.us-east1.run.app/health"
-      ).then((r) => r.json());
+      const wsHealth = await predifiApi.websocketHealth();
       newStatuses.push({
         name: "WebSocket Service",
-        status: wsHealth.status === "ok" ? "ok" : "degraded",
-        lastChecked: new Date().toLocaleTimeString(),
-        details: wsHealth.stats,
-      });
-    } catch (error) {
-      newStatuses.push({
-        name: "WebSocket Service",
-        status: "error",
-        lastChecked: new Date().toLocaleTimeString(),
-      });
-    }
-
-    // Check Vertex Service
-    try {
-      const vertexHealth = await predifiApi.vertexHealthCheck();
-      newStatuses.push({
-        name: "Vertex Service",
-        status: vertexHealth.status === "ok" ? "ok" : "degraded",
+        status: wsHealth.status === "healthy" ? "ok" : "degraded",
         lastChecked: new Date().toLocaleTimeString(),
         details: {
-          uptime: `${Math.floor(vertexHealth.uptimeSeconds / 60)}m`,
-          env: vertexHealth.env.nodeEnv,
+          connections: wsHealth.metrics.activeConnections,
+          clobConnected: wsHealth.clobClient.connected,
         },
       });
-    } catch (error) {
+    } catch {
       newStatuses.push({
-        name: "Vertex Service",
+        name: "WebSocket Service",
         status: "error",
         lastChecked: new Date().toLocaleTimeString(),
       });
@@ -85,7 +65,7 @@ export function ApiHealthMonitor() {
 
   useEffect(() => {
     checkHealth();
-    const interval = setInterval(checkHealth, 60000); // Check every minute
+    const interval = setInterval(checkHealth, 60000);
     return () => clearInterval(interval);
   }, []);
 
