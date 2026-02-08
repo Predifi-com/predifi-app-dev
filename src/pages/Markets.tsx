@@ -84,11 +84,12 @@ const Markets = () => {
     const standalone: typeof filteredMarkets = [];
 
     filteredMarkets.forEach(market => {
-      // Markets already pre-grouped by API (have outcomes array)
-      if (market.outcomes && Array.isArray(market.outcomes) && market.outcomes.length >= 2) {
+      // Markets already pre-grouped by API (have outcomes array with 3+ items)
+      if (market.outcomes && Array.isArray(market.outcomes) && market.outcomes.length > 2) {
         standalone.push(market); // treat as self-contained multi-outcome
         return;
       }
+      // Group by group_id (works for both Polymarket binary groups and Limitless categorical)
       if (market.group_id) {
         const existing = groupMap.get(market.group_id) || [];
         existing.push(market);
@@ -102,17 +103,19 @@ const Markets = () => {
 
     // Step 2: Build grouped multi-outcome cards
     groupMap.forEach((groupMarkets, groupId) => {
-      if (groupMarkets.length < 2) {
-        // Single market in group — treat as binary
-        standalone.push(groupMarkets[0]);
+      if (groupMarkets.length <= 2) {
+        // 1-2 markets in a group — treat as individual binary cards
+        groupMarkets.forEach(m => standalone.push(m));
         return;
       }
       const first = groupMarkets[0];
       const totalVol = groupMarkets.reduce((s, m) => s + (m.volume_total || m.volume_24h || 0), 0);
-      const outcomes = groupMarkets.map(m => ({
-        label: m.title,
-        probability: m.yes_price ?? 50,
-      }));
+      
+      // Extract outcome labels: use group_item_title if available, otherwise derive from title
+      const outcomes = groupMarkets.map(m => {
+        const label = (m as any).group_item_title || m.title;
+        return { label, probability: m.yes_price ?? 50 };
+      });
 
       items.push({
         type: 'multi_outcome',
@@ -141,7 +144,7 @@ const Markets = () => {
     // Step 3: Build standalone cards (binary + pre-grouped multi)
     standalone.forEach(market => {
       const apiOutcomes = market.outcomes;
-      const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length >= 2;
+      const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length > 2;
       const effectiveVolume = (market.volume_total || market.volume_24h || 0);
 
       items.push({
