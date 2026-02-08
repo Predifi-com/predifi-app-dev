@@ -2,15 +2,12 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryNav from "@/components/CategoryNav";
 import MarketFilters from "@/components/MarketFilters";
-import Sidebar from "@/components/Sidebar";
 import { MarketSearch } from "@/components/MarketSearch";
 import { SEO } from "@/components/SEO";
 
 import { useState, useEffect, useMemo } from "react";
-import InfiniteScroll from "react-infinite-scroll-component";
 import { useLocalMarkets } from "@/hooks/useLocalMarkets";
-import { MarketCardWrapper } from "@/components/MarketCardWrapper";
-import { LoadingSpinner } from "@/components/LoadingSpinner";
+import { MinimalMarketCard } from "@/components/MinimalMarketCard";
 import { MarketCardSkeleton } from "@/components/MarketCardSkeleton";
 import { MarketFiltersSettings } from "@/components/MarketFiltersSettings";
 
@@ -80,15 +77,75 @@ const Markets = () => {
       });
   }, [markets, searchQuery, showClosed, venue]);
 
-  // Transform markets into displayable items
+  // Group markets by group_id and transform into displayable items
   const displayMarkets = useMemo(() => {
-    return filteredMarkets.map(market => {
-      // Detect multi-outcome from API data
-      const apiOutcomes = (market as any).outcomes;
-      const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length > 2;
+    // Step 1: Separate grouped and ungrouped markets
+    const groupMap = new Map<string, typeof filteredMarkets>();
+    const standalone: typeof filteredMarkets = [];
 
-      return {
-        type: 'binary' as const,
+    filteredMarkets.forEach(market => {
+      // Markets already pre-grouped by API (have outcomes array)
+      if (market.outcomes && Array.isArray(market.outcomes) && market.outcomes.length >= 2) {
+        standalone.push(market); // treat as self-contained multi-outcome
+        return;
+      }
+      if (market.group_id) {
+        const existing = groupMap.get(market.group_id) || [];
+        existing.push(market);
+        groupMap.set(market.group_id, existing);
+      } else {
+        standalone.push(market);
+      }
+    });
+
+    const items: Array<{ type: 'binary' | 'multi_outcome'; market: any }> = [];
+
+    // Step 2: Build grouped multi-outcome cards
+    groupMap.forEach((groupMarkets, groupId) => {
+      if (groupMarkets.length < 2) {
+        // Single market in group — treat as binary
+        standalone.push(groupMarkets[0]);
+        return;
+      }
+      const first = groupMarkets[0];
+      const totalVol = groupMarkets.reduce((s, m) => s + (m.volume_total || m.volume_24h || 0), 0);
+      const outcomes = groupMarkets.map(m => ({
+        label: m.title,
+        probability: m.yes_price ?? 50,
+      }));
+
+      items.push({
+        type: 'multi_outcome',
+        market: {
+          id: groupId,
+          title: first.title.split('?')[0] + '?' || first.title,
+          description: first.description || '',
+          yesPercentage: 50,
+          noPercentage: 50,
+          totalVolume: totalVol,
+          liquidity: groupMarkets.reduce((s, m) => s + (m.liquidity || 0), 0),
+          volume24h: groupMarkets.reduce((s, m) => s + (m.volume_24h || 0), 0),
+          openInterest: 0,
+          endDate: first.resolution_date || first.expires_at || '',
+          imageUrl: first.image_url || '',
+          status: first.status,
+          venue: first.venue || 'predifi',
+          category: first.category || '',
+          createdAt: first.created_at || '',
+          marketType: 'multi_outcome' as const,
+          outcomes,
+        },
+      });
+    });
+
+    // Step 3: Build standalone cards (binary + pre-grouped multi)
+    standalone.forEach(market => {
+      const apiOutcomes = market.outcomes;
+      const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length >= 2;
+      const effectiveVolume = (market.volume_total || market.volume_24h || 0);
+
+      items.push({
+        type: isMulti ? 'multi_outcome' : 'binary',
         market: {
           id: market.id,
           title: market.title,
@@ -97,7 +154,7 @@ const Markets = () => {
           noPrice: (market.no_price ?? 50) / 100,
           yesPercentage: market.yes_price ?? 50,
           noPercentage: market.no_price ?? 50,
-          totalVolume: market.volume_total ?? 0,
+          totalVolume: effectiveVolume,
           liquidity: market.liquidity ?? 0,
           volume24h: market.volume_24h ?? 0,
           openInterest: market.open_interest ?? 0,
@@ -109,11 +166,13 @@ const Markets = () => {
           createdAt: market.created_at || '',
           marketType: isMulti ? 'multi_outcome' as const : 'binary' as const,
           outcomes: isMulti
-            ? apiOutcomes.map((o: any) => ({ label: o.label || o.name, probability: o.probability ?? o.price ?? 0 }))
+            ? apiOutcomes.map((o: any) => ({ label: o.label || o.name, probability: Math.round((o.price ?? 0) * 100) }))
             : undefined,
-        }
-      };
+        },
+      });
     });
+
+    return items;
   }, [filteredMarkets]);
 
   // Refresh handler
@@ -216,10 +275,20 @@ const Markets = () => {
                 </div>
               ) : (
                 displayMarkets.map((item) => (
-                  <MarketCardWrapper
+                  <MinimalMarketCard
                     key={item.market.id}
-                    item={item}
+                    id={item.market.id}
+                    title={item.market.title}
+                    description={item.market.description}
+                    yesPercentage={item.market.yesPercentage}
+                    noPercentage={item.market.noPercentage}
+                    totalVolume={item.market.totalVolume}
+                    venue={item.market.venue}
+                    imageUrl={item.market.imageUrl}
+                    endDate={item.market.endDate}
                     animationsEnabled={animationsEnabled}
+                    marketType={item.market.marketType}
+                    outcomes={item.market.outcomes}
                   />
                 ))
               )}

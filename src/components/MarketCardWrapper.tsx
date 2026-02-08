@@ -15,9 +15,8 @@ export function MarketCardWrapper({ item, animationsEnabled = true }: MarketCard
 
   const m = item.market;
 
-  // Detect multi-outcome: if the market has an outcomes array with 3+ items
-  const isMulti = (m as any).outcomes && (m as any).outcomes.length > 2;
-  const outcomes: MarketOutcome[] | undefined = isMulti ? (m as any).outcomes : undefined;
+  const isMulti = m.marketType === 'multi_outcome' && m.outcomes && m.outcomes.length >= 2;
+  const outcomes: MarketOutcome[] | undefined = isMulti ? m.outcomes : undefined;
 
   return (
     <MinimalMarketCard
