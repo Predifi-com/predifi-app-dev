@@ -78,42 +78,64 @@ const Markets = () => {
   }, [markets, searchQuery, showClosed, venue]);
 
   /**
-   * Given an array of similar titles, extract the unique differentiating segment from each.
-   * e.g. ["Will Trump nominate Judy Shelton as...", "Will Trump nominate Kevin Warsh as..."]
-   *   → ["Judy Shelton", "Kevin Warsh"]
+   * Extract short, unique labels from grouped market titles.
+   * Strips common prefix, then trims trailing common phrases.
    */
   function extractUniqueSegments(titles: string[]): string[] {
     if (titles.length <= 1) return titles;
     
-    // Find common prefix
-    let prefix = '';
+    // Find common prefix (character by character)
     const first = titles[0];
+    let prefixLen = 0;
     for (let i = 0; i < first.length; i++) {
-      const char = first[i];
-      if (titles.every(t => t[i] === char)) {
-        prefix += char;
-      } else break;
+      if (titles.every(t => t[i] === first[i])) prefixLen = i + 1;
+      else break;
     }
 
-    // Find common suffix
-    let suffix = '';
-    const reversed = titles.map(t => t.split('').reverse().join(''));
-    const firstRev = reversed[0];
-    for (let i = 0; i < firstRev.length; i++) {
-      const char = firstRev[i];
-      if (reversed.every(t => t[i] === char)) {
-        suffix = char + suffix;
-      } else break;
-    }
-
-    const results = titles.map(t => {
-      let segment = t.slice(prefix.length, suffix.length ? -suffix.length : undefined).trim();
-      // Clean up leading/trailing punctuation
-      segment = segment.replace(/^[,\s?]+|[,\s?]+$/g, '').trim();
-      return segment || t; // fallback to full title if empty
+    // Strip prefix and clean
+    let segments = titles.map(t => {
+      let s = t.slice(prefixLen).trim();
+      s = s.replace(/^[,\s?]+/, '').trim();
+      return s;
     });
 
-    return results;
+    // Find common suffix among ≥80% of segments (word-level, tolerates outliers)
+    const wordArrays = segments.map(s => s.split(/\s+/));
+    const threshold = Math.ceil(segments.length * 0.8);
+    const minLen = Math.min(...wordArrays.map(w => w.length));
+    let suffixWords = 0;
+    for (let i = 1; i <= minLen - 1; i++) {
+      const word = wordArrays[0][wordArrays[0].length - i];
+      const matches = wordArrays.filter(w => w[w.length - i] === word).length;
+      if (matches >= threshold) {
+        suffixWords = i;
+      } else break;
+    }
+
+    if (suffixWords > 0) {
+      segments = segments.map(s => {
+        const words = s.split(/\s+/);
+        // Only strip suffix if this segment actually ends with those words
+        const refWords = wordArrays[0];
+        const suffixMatch = Array.from({ length: suffixWords }, (_, i) => 
+          refWords[refWords.length - 1 - i]
+        ).reverse();
+        const segEnd = words.slice(-suffixWords);
+        if (segEnd.join(' ') === suffixMatch.join(' ')) {
+          return words.slice(0, words.length - suffixWords).join(' ');
+        }
+        return s;
+      });
+    }
+
+    // Final cleanup: strip trailing articles/prepositions and punctuation
+    return segments.map((s, i) => {
+      s = s.replace(/[,\s?!.]+$/, '').trim();
+      // Remove trailing partial connectors like "as the", "in the", "of the", "for the"
+      s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim();
+      s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim(); // second pass
+      return s || titles[i]; // fallback
+    });
   }
 
   // Group markets by group_id and transform into displayable items
