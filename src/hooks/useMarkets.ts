@@ -7,7 +7,6 @@ interface UseMarketsResult {
   isLoading: boolean;
   error: Error | null;
   hasMore: boolean;
-  nextCursor?: string;
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
   total?: number;
@@ -21,32 +20,34 @@ export const useMarkets = (
   const [markets, setMarkets] = useState<Market[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const [nextCursor, setNextCursor] = useState<string | undefined>();
   const [hasMore, setHasMore] = useState(true);
   const [total, setTotal] = useState<number | undefined>();
+  const [offset, setOffset] = useState(0);
 
   const fetchMarkets = useCallback(
-    async (cursor?: string, append: boolean = false) => {
+    async (currentOffset: number = 0, append: boolean = false) => {
       setIsLoading(true);
       setError(null);
 
       try {
-        const pagination: PaginationCursor = {
-          cursor,
+        const response = await apiService.getMarkets(filters, sort, {
           limit: initialLimit,
-        };
+          cursor: undefined,
+        });
 
-        const response = await apiService.getMarkets(filters, sort, pagination);
+        // The response is a ListMarketsResponse from v2
+        const responseData = response as any;
+        const fetchedMarkets = (responseData.markets || []) as Market[];
 
         if (append) {
-          setMarkets((prev) => [...prev, ...response.markets]);
+          setMarkets((prev) => [...prev, ...fetchedMarkets]);
         } else {
-          setMarkets(response.markets);
+          setMarkets(fetchedMarkets);
         }
 
-        setNextCursor(response.nextCursor);
-        setHasMore(response.hasMore);
-        setTotal(response.total);
+        setTotal(responseData.total);
+        setHasMore(currentOffset + initialLimit < (responseData.total || 0));
+        setOffset(currentOffset);
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Failed to fetch markets"));
         console.error("Error fetching markets:", err);
@@ -58,12 +59,12 @@ export const useMarkets = (
   );
 
   const loadMore = useCallback(async () => {
-    if (!hasMore || isLoading || !nextCursor) return;
-    await fetchMarkets(nextCursor, true);
-  }, [hasMore, isLoading, nextCursor, fetchMarkets]);
+    if (!hasMore || isLoading) return;
+    await fetchMarkets(offset + initialLimit, true);
+  }, [hasMore, isLoading, offset, initialLimit, fetchMarkets]);
 
   const refresh = useCallback(async () => {
-    await fetchMarkets(undefined, false);
+    await fetchMarkets(0, false);
   }, [fetchMarkets]);
 
   useEffect(() => {
@@ -75,7 +76,6 @@ export const useMarkets = (
     isLoading,
     error,
     hasMore,
-    nextCursor,
     loadMore,
     refresh,
     total,

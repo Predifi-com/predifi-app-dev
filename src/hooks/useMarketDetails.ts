@@ -28,8 +28,8 @@ export const useMarketDetails = (marketId: string): UseMarketDetailsResult => {
         apiService.getMarketStats(marketId),
       ]);
 
-      setMarket(marketData);
-      setStats(statsData);
+      setMarket(marketData as unknown as Market | null);
+      setStats(statsData as unknown as MarketStats | null);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch market details"));
       console.error("Error fetching market details:", err);
@@ -46,11 +46,5 @@ export const useMarketDetails = (marketId: string): UseMarketDetailsResult => {
     fetchMarketDetails();
   }, [marketId]);
 
-  return {
-    market,
-    stats,
-    isLoading,
-    error,
-    refresh,
-  };
+  return { market, stats, isLoading, error, refresh };
 };

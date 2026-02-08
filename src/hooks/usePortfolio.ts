@@ -40,10 +40,10 @@ export const usePortfolio = (userAddress?: string): UsePortfolioResult => {
         apiService.getUserAnalytics(userAddress),
       ]);
 
-      setPositions(positionsData);
-      setTransactions(transactionsData);
-      setSummary(summaryData);
-      setAnalytics(analyticsData);
+      setPositions(positionsData as unknown as Position[]);
+      setTransactions(transactionsData as unknown as Transaction[]);
+      setSummary(summaryData as unknown as PortfolioSummary);
+      setAnalytics(analyticsData as unknown as UserAnalytics);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch portfolio"));
       console.error("Error fetching portfolio:", err);
@@ -61,29 +61,17 @@ export const usePortfolio = (userAddress?: string): UsePortfolioResult => {
 
     if (!userAddress) return;
 
-    // Subscribe to real-time position updates
     const unsubscribe = service.subscribe("position_update", (event: WebSocketEvent) => {
       if (event.type === "position_update") {
-        const update = event.data;
+        const update = event as any;
         if (update.userAddress === userAddress) {
-          // Refresh portfolio on position updates
           fetchPortfolio();
         }
       }
     });
 
-    return () => {
-      unsubscribe();
-    };
+    return () => { unsubscribe(); };
   }, [userAddress, service]);
 
-  return {
-    positions,
-    transactions,
-    summary,
-    analytics,
-    isLoading,
-    error,
-    refresh,
-  };
+  return { positions, transactions, summary, analytics, isLoading, error, refresh };
 };

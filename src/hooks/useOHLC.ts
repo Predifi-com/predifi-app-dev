@@ -12,8 +12,8 @@ interface UseOHLCResult {
 export const useOHLC = (
   marketId: string,
   timeframe: TimeFrame,
-  from?: number,
-  to?: number
+  _from?: number,
+  _to?: number
 ): UseOHLCResult => {
   const [data, setData] = useState<OHLCData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,8 +26,8 @@ export const useOHLC = (
     setError(null);
 
     try {
-      const ohlcData = await apiService.getOHLC(marketId, timeframe, from, to);
-      setData(ohlcData);
+      const ohlcData = await apiService.getOHLC(marketId, timeframe);
+      setData(ohlcData as OHLCData[]);
     } catch (err) {
       setError(err instanceof Error ? err : new Error("Failed to fetch OHLC data"));
       console.error("Error fetching OHLC data:", err);
@@ -42,12 +42,7 @@ export const useOHLC = (
 
   useEffect(() => {
     fetchOHLC();
-  }, [marketId, timeframe, from, to]);
+  }, [marketId, timeframe]);
 
-  return {
-    data,
-    isLoading,
-    error,
-    refresh,
-  };
+  return { data, isLoading, error, refresh };
 };
