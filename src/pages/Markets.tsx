@@ -97,6 +97,7 @@ const Markets = () => {
         volume24h: market.volume_24h ?? 0,
         openInterest: market.open_interest ?? 0,
         endDate: market.resolution_date || market.expires_at || '',
+        imageUrl: market.image_url || '',
         status: market.status,
         venue: market.venue || 'predifi',
         category: market.category || '',
