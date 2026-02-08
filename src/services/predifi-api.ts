@@ -256,6 +256,31 @@ class PredifiApiService {
     return this.request('/api/websocket/stats');
   }
 
+  // ============= Volume Normalization =============
+
+  /**
+   * Limitless volumes are in raw USDC (6 decimals).
+   * Polymarket and Predifi volumes are already in USD.
+   * Normalize so all consumers see USD values.
+   */
+  private normalizeMarketVolumes(market: PredifiMarket): PredifiMarket {
+    if (market.venue === 'limitless') {
+      const div = 1_000_000;
+      return {
+        ...market,
+        volume_24h: market.volume_24h / div,
+        volume_total: market.volume_total / div,
+        liquidity: market.liquidity / div,
+        open_interest: market.open_interest / div,
+        outcomes: market.outcomes?.map(o => ({
+          ...o,
+          volume: o.volume / div,
+        })) ?? market.outcomes,
+      };
+    }
+    return market;
+  }
+
   // ============= Markets =============
 
   /** List aggregated markets from all venues */
@@ -272,7 +297,11 @@ class PredifiApiService {
         if (v !== undefined) q.append(k, v.toString());
       });
     }
-    return this.request<ListMarketsResponse>(`/api/aggregated${q.toString() ? `?${q}` : ''}`);
+    const res = await this.request<ListMarketsResponse>(`/api/aggregated${q.toString() ? `?${q}` : ''}`);
+    return {
+      ...res,
+      markets: (res.markets || []).map(m => this.normalizeMarketVolumes(m)),
+    };
   }
 
   /** List Predifi-native markets only */
