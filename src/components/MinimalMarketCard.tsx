@@ -1,4 +1,5 @@
-import { Bot, MessageCircle, Clock, Layers } from "lucide-react";
+import { Bot, Clock, Layers } from "lucide-react";
+import { getCategoryIcon } from "@/lib/category-icons";
 import { motion } from "framer-motion";
 import { useState, useMemo } from "react";
 import { MarketExpandedModal } from "./MarketExpandedModal";
@@ -119,11 +120,14 @@ export function MinimalMarketCard({
           <div className="w-10 h-10 rounded-xl overflow-hidden flex-shrink-0 bg-muted">
             {imageUrl ? (
               <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                <MessageCircle className="w-5 h-5" />
-              </div>
-            )}
+            ) : (() => {
+              const FallbackIcon = getCategoryIcon(undefined, title);
+              return (
+                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                  <FallbackIcon className="w-5 h-5" />
+                </div>
+              );
+            })()}
           </div>
           <h3 className="font-semibold text-foreground text-[15px] leading-snug pr-8 line-clamp-3 flex-1 min-w-0">
             {title}

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { TrendingUp, Calendar, Maximize2 } from 'lucide-react';
+import { Calendar, Maximize2 } from 'lucide-react';
+import { getCategoryIcon } from '@/lib/category-icons';
 import botIcon from '@/assets/bot-icon.png';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -78,11 +79,14 @@ export function MarketGroupCard({ group, animationsEnabled = true }: MarketGroup
             <div className="w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 bg-primary/10 shadow-md">
               {group.imageUrl ? (
                 <img src={group.imageUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-primary">
-                  <TrendingUp className="w-8 h-8" />
-                </div>
-              )}
+              ) : (() => {
+                const Icon = getCategoryIcon(group.category, group.question);
+                return (
+                  <div className="w-full h-full flex items-center justify-center text-primary">
+                    <Icon className="w-8 h-8" />
+                  </div>
+                );
+              })()}
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="font-bold text-foreground line-clamp-2 text-lg">{group.question}</h3>
