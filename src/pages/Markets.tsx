@@ -52,9 +52,10 @@ function TradingView({
     <div className="min-h-screen bg-background flex flex-col">
       <SEO title={`${selected.asset} ${selected.timeframe} | Predifi`} description="Trade prediction markets." />
       <Header />
-      <div className="flex flex-1 h-[calc(100vh-3.5rem)] overflow-hidden">
-        {/* Left: scrollable market list — hourly first, then daily */}
-        <div className="w-64 xl:w-72 border-r border-border flex-shrink-0 hidden md:flex flex-col">
+      {/* 12-column grid: 3 / 6 / 3 */}
+      <div className="flex-1 grid grid-cols-12 h-[calc(100vh-3.5rem)] overflow-hidden">
+        {/* Left (3 cols): scrollable market list */}
+        <div className="col-span-3 border-r border-border hidden md:flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={onBack}>
               <ArrowLeft className="w-4 h-4" />
@@ -63,38 +64,16 @@ function TradingView({
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
-              {/* Hourly section */}
-              <div className="px-2 pt-2 pb-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Hourly</span>
-              </div>
-              {ASSETS.map((asset) => (
+              {ORDERED_MARKETS.map(({ asset, timeframe }) => (
                 <div
-                  key={`${asset}-hourly`}
-                  onClick={() => onSelect({ asset, timeframe: "hourly" })}
+                  key={`${asset}-${timeframe}`}
+                  onClick={() => onSelect({ asset, timeframe })}
                   className="cursor-pointer"
                 >
                   <CoinbaseMarketCard
                     asset={asset}
-                    timeframe="hourly"
-                    isSelected={selected.asset === asset && selected.timeframe === "hourly"}
-                    compact
-                  />
-                </div>
-              ))}
-              {/* Daily section */}
-              <div className="px-2 pt-3 pb-1">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Daily</span>
-              </div>
-              {ASSETS.map((asset) => (
-                <div
-                  key={`${asset}-daily`}
-                  onClick={() => onSelect({ asset, timeframe: "daily" })}
-                  className="cursor-pointer"
-                >
-                  <CoinbaseMarketCard
-                    asset={asset}
-                    timeframe="daily"
-                    isSelected={selected.asset === asset && selected.timeframe === "daily"}
+                    timeframe={timeframe}
+                    isSelected={selected.asset === asset && selected.timeframe === timeframe}
                     compact
                   />
                 </div>
@@ -103,8 +82,8 @@ function TradingView({
           </ScrollArea>
         </div>
 
-        {/* Center: chart (fixed, no scroll) + position management */}
-        <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
+        {/* Center (6 cols): chart + positions — no scroll */}
+        <div className="col-span-12 md:col-span-6 flex flex-col overflow-hidden">
           <div className="flex-1 min-h-0 p-4">
             <CoinbaseMarketCard
               asset={selected.asset}
@@ -112,7 +91,6 @@ function TradingView({
               expanded
             />
           </div>
-          {/* Position management below chart */}
           <PositionManagement />
           {/* Mobile back */}
           <div className="md:hidden p-3 border-t border-border">
@@ -122,8 +100,8 @@ function TradingView({
           </div>
         </div>
 
-        {/* Right: orderbook (fixed, no scroll) */}
-        <div className="w-72 xl:w-80 border-l border-border flex-shrink-0 hidden lg:flex flex-col overflow-hidden">
+        {/* Right (3 cols): orderbook — no scroll */}
+        <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
           <TradingOrderbook asset={selected.asset} yesProb={yesProb} />
         </div>
       </div>
