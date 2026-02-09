@@ -78,7 +78,11 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
       const batchSize = fetchedMarkets.length;
 
       if (append) {
-        setMarkets(prev => [...prev, ...fetchedMarkets]);
+        setMarkets(prev => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newOnly = fetchedMarkets.filter(m => !existingIds.has(m.id));
+          return [...prev, ...newOnly];
+        });
       } else {
         setMarkets(fetchedMarkets);
       }
@@ -115,8 +119,11 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
     fetchMarkets(0, false);
   }, [fetchMarkets]);
 
-  // Re-fetch when filter params change
+  // Re-fetch when filter params change — reset pagination state
   useEffect(() => {
+    setOffset(0);
+    setLastBatchSize(0);
+    setTotal(0);
     fetchMarkets(0, false);
   }, [params.category, params.venue, params.status, fetchMarkets]);
 
