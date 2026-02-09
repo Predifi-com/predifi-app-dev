@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,9 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onT
   const collapsed = isControlled ? !isOpen : internalCollapsed;
 
   const [bookSide, setBookSide] = useState<"yes" | "no">(side);
+  const [flashIndex, setFlashIndex] = useState<{ type: "bid" | "ask"; index: number } | null>(null);
+  const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useMemo(() => setBookSide(side), [side]);
 
   const basePrice = bookSide === "yes" ? yesProb : 100 - yesProb;
@@ -37,6 +40,14 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onT
   const bids = generateLevels(basePrice, 5, false);
   const maxTotal = Math.max(...asks.map(a => a.total), ...bids.map(b => b.total));
 
+  const handlePriceClick = useCallback((price: number, type: "bid" | "ask", index: number) => {
+    onPriceClick?.(price);
+    // Flash the row
+    setFlashIndex({ type, index });
+    if (flashTimeout.current) clearTimeout(flashTimeout.current);
+    flashTimeout.current = setTimeout(() => setFlashIndex(null), 400);
+  }, [onPriceClick]);
+
   const handleToggle = () => {
     if (isControlled) {
       onToggle?.();
@@ -44,6 +55,9 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onT
       setInternalCollapsed(!internalCollapsed);
     }
   };
+
+  const isFlashing = (type: "bid" | "ask", i: number) =>
+    flashIndex?.type === type && flashIndex?.index === i;
 
   return (
     <div className="border-t border-border">
@@ -78,7 +92,14 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onT
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-0.5">
               {bids.map((bid, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(bid.price)}>
+                <div
+                  key={i}
+                  className={cn(
+                    "flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-all duration-150",
+                    isFlashing("bid", i) && "bg-emerald-500/20 ring-1 ring-emerald-500/40"
+                  )}
+                  onClick={() => handlePriceClick(bid.price, "bid", i)}
+                >
                   <div className="absolute left-0 top-0 bottom-0 bg-emerald-500/8" style={{ width: `${(bid.total / maxTotal) * 100}%` }} />
                   <span className="text-emerald-500 font-medium tabular-nums relative z-10">{bid.price.toFixed(1)}¢</span>
                   <span className="text-muted-foreground tabular-nums relative z-10">{bid.size}</span>
@@ -88,7 +109,14 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onT
 
             <div className="space-y-0.5">
               {asks.map((ask, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(ask.price)}>
+                <div
+                  key={i}
+                  className={cn(
+                    "flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-all duration-150",
+                    isFlashing("ask", i) && "bg-red-500/20 ring-1 ring-red-500/40"
+                  )}
+                  onClick={() => handlePriceClick(ask.price, "ask", i)}
+                >
                   <div className="absolute right-0 top-0 bottom-0 bg-red-500/8" style={{ width: `${(ask.total / maxTotal) * 100}%` }} />
                   <span className="text-red-500 font-medium tabular-nums relative z-10">{ask.price.toFixed(1)}¢</span>
                   <span className="text-muted-foreground tabular-nums relative z-10">{ask.size}</span>
