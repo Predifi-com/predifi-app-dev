@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Menu, Settings, ChevronDown, X, BookOpen } from "lucide-react";
+import { Menu, Settings, ChevronDown, X, BookOpen, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/WalletButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -8,6 +8,7 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { UserAccountMenu } from "@/components/account/UserAccountMenu";
 import { ArenaEquityBadge } from "@/components/account/ArenaEquityBadge";
 import { DepositModal } from "@/components/account/DepositModal";
+import { ConsensusWidget } from "@/components/ConsensusWidget";
 import { Link, useLocation } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
 import { usePredifiWallet } from "@/contexts/PredifiWalletContext";
@@ -220,6 +221,9 @@ const Header = () => {
 
           {/* Right Section */}
           <div className="flex items-center gap-1">
+            {/* Consensus Probability */}
+            <ConsensusWidget />
+
             {/* Search */}
             <SearchDialog />
 
