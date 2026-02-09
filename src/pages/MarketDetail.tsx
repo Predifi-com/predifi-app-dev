@@ -6,45 +6,88 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, TrendingUp, TrendingDown, Activity, Users, ExternalLink } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, ExternalLink, Loader2 } from "lucide-react";
 import { MarketChart } from "@/components/MarketChart";
 import { OrderbookWidget } from "@/components/OrderbookWidget";
-import { MarketDetailModal } from "@/components/MarketDetailModal";
+import { TradingModal } from "@/components/TradingModal";
 import { MobileMarketDetail } from "@/components/MobileMarketDetail";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useMarketDetails } from "@/hooks/useMarketDetails";
 import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
 import { useActivityTracking } from "@/hooks/useActivityTracking";
+import { useWebSocket } from "@/providers/WebSocketProvider";
 import LeverageTradeWidget from "@/components/LeverageTradeWidget";
 import LeveragePositionsList from "@/components/LeveragePositionsList";
+import { predifiApi, type PredifiMarket } from "@/services/predifi-api";
+import type { WebSocketEvent, MarketUpdateEvent } from "@/services/websocket";
+
+function formatVolume(v: number): string {
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
+  return v.toFixed(0);
+}
 
 const MarketDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [tradingModalOpen, setTradingModalOpen] = useState(false);
+  const [preselectedSide, setPreselectedSide] = useState<'yes' | 'no'>('yes');
   const { trackActivity } = useActivityTracking();
   const isMobile = useIsMobile();
+  const { service } = useWebSocket();
 
-  // Mock market data - replace with real API call using id
-  const market = {
-    id: id || "1",
-    title: "Bitcoin above $100K by March 2026?",
-    description: "Will Bitcoin (BTC) reach or exceed $100,000 USD by March 31, 2026, 23:59:59 UTC according to CoinGecko?",
-    yesPercentage: 67,
-    noPercentage: 33,
-    volume: "5.2M",
-    liquidity: "2.8M",
-    participants: 1847,
-    endDate: "March 31, 2026",
-    category: "Crypto",
-    venue: "Polymarket",
-    creator: "0x1234...5678",
-    resolutionSource: "CoinGecko API",
-  };
+  // Real API data
+  const [market, setMarket] = useState<PredifiMarket | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const { trades } = useTradeHistory(market.id);
+  // Fetch market from API
+  useEffect(() => {
+    if (!id) return;
+    setIsLoading(true);
+    setError(null);
 
+    predifiApi.listAggregatedMarkets({ limit: 300 }).then((res) => {
+      const found = res.markets.find((m) => m.id === id);
+      if (found) {
+        setMarket(found);
+      } else {
+        setError("Market not found");
+      }
+    }).catch((err) => {
+      console.error("Failed to fetch market:", err);
+      setError("Failed to load market data");
+    }).finally(() => setIsLoading(false));
+  }, [id]);
+
+  // Subscribe to real-time price updates via WebSocket
+  useEffect(() => {
+    if (!id || !market) return;
+
+    // Subscribe to market channel for real-time updates
+    service.subscribeToMarkets(['markets', 'orderbook', 'trades'], [market.venue_market_id || id]);
+
+    const unsubscribe = service.subscribe(`market:${id}`, (event: WebSocketEvent) => {
+      if (event.type === 'market_update') {
+        const update = event as unknown as MarketUpdateEvent;
+        setMarket((prev) =>
+          prev ? {
+            ...prev,
+            yes_price: update.yes_price ?? prev.yes_price,
+            no_price: update.no_price ?? prev.no_price,
+            volume_24h: update.volume_24h ?? prev.volume_24h,
+          } : prev
+        );
+      }
+    });
+
+    return () => {
+      unsubscribe();
+      service.unsubscribeFromMarkets(['markets', 'orderbook', 'trades'], [market.venue_market_id || id]);
+    };
+  }, [id, market?.venue_market_id, service]);
+
+  // Track page view
   useEffect(() => {
     if (market) {
       trackActivity({
@@ -56,10 +99,50 @@ const MarketDetail = () => {
         },
       });
     }
-  }, [id]);
+  }, [market?.id]);
+
+  const { trades } = useTradeHistory(id || "");
 
   const handleTrade = (side: "yes" | "no") => {
+    setPreselectedSide(side);
     setTradingModalOpen(true);
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="flex items-center justify-center py-32">
+          <LoadingSpinner />
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !market) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <div className="container mx-auto px-4 py-16 text-center">
+          <h2 className="text-2xl font-bold mb-2">Market Not Found</h2>
+          <p className="text-muted-foreground mb-6">{error || "This market doesn't exist."}</p>
+          <Button onClick={() => navigate("/markets")}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Markets
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const yesPercentage = Math.round(market.yes_price * 100);
+  const noPercentage = Math.round(market.no_price * 100);
+
+  const tradingMarket = {
+    id: market.id,
+    title: market.title,
+    yesPercentage,
+    noPercentage,
   };
 
   return (
@@ -68,11 +151,7 @@ const MarketDetail = () => {
 
       <div className="container mx-auto px-4 py-6">
         {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => navigate(-1)}
-          className="mb-4"
-        >
+        <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Markets
         </Button>
@@ -83,64 +162,81 @@ const MarketDetail = () => {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-3">
                 <Badge>{market.category}</Badge>
-                <Badge variant="outline">{market.venue}</Badge>
+                <Badge variant="outline" className="capitalize">{market.venue}</Badge>
+                <Badge variant={market.status === 'active' ? 'default' : 'secondary'} className="capitalize">
+                  {market.status}
+                </Badge>
               </div>
               <h1 className="text-3xl font-bold mb-2">{market.title}</h1>
-              <p className="text-muted-foreground">{market.description}</p>
+              {market.description && (
+                <p className="text-muted-foreground">{market.description}</p>
+              )}
             </div>
+            {market.external_url && (
+              <Button variant="outline" size="sm" asChild>
+                <a href={market.external_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="w-4 h-4 mr-1" /> Source
+                </a>
+              </Button>
+            )}
           </div>
 
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground mb-1">Volume</div>
-              <div className="text-2xl font-bold">${market.volume}</div>
+              <div className="text-sm text-muted-foreground mb-1">Volume (24h)</div>
+              <div className="text-2xl font-bold">${formatVolume(market.volume_24h)}</div>
             </Card>
             <Card className="p-4">
               <div className="text-sm text-muted-foreground mb-1">Liquidity</div>
-              <div className="text-2xl font-bold">${market.liquidity}</div>
+              <div className="text-2xl font-bold">${formatVolume(market.liquidity)}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground mb-1">Participants</div>
-              <div className="text-2xl font-bold">{market.participants.toLocaleString()}</div>
+              <div className="text-sm text-muted-foreground mb-1">Traders</div>
+              <div className="text-2xl font-bold">{market.num_traders.toLocaleString()}</div>
             </Card>
             <Card className="p-4">
-              <div className="text-sm text-muted-foreground mb-1">Ends</div>
-              <div className="text-lg font-bold">{market.endDate}</div>
+              <div className="text-sm text-muted-foreground mb-1">Expires</div>
+              <div className="text-lg font-bold">
+                {new Date(market.expires_at).toLocaleDateString(undefined, {
+                  month: 'short', day: 'numeric', year: 'numeric',
+                })}
+              </div>
             </Card>
           </div>
 
           {/* Trading Buttons */}
-          <div className="grid grid-cols-2 gap-4">
-            <Button
-              size="lg"
-              className="bg-success hover:bg-success/90 text-success-foreground"
-              onClick={() => handleTrade("yes")}
-            >
-              <TrendingUp className="w-5 h-5 mr-2" />
-              Buy YES @ {market.yesPercentage}¢
-            </Button>
-            <Button
-              size="lg"
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
-              onClick={() => handleTrade("no")}
-            >
-              <TrendingDown className="w-5 h-5 mr-2" />
-              Buy NO @ {market.noPercentage}¢
-            </Button>
-          </div>
+          {market.accepting_orders && (
+            <div className="grid grid-cols-2 gap-4">
+              <Button
+                size="lg"
+                className="bg-success hover:bg-success/90 text-success-foreground"
+                onClick={() => handleTrade("yes")}
+              >
+                <TrendingUp className="w-5 h-5 mr-2" />
+                Buy YES @ {yesPercentage}¢
+              </Button>
+              <Button
+                size="lg"
+                className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                onClick={() => handleTrade("no")}
+              >
+                <TrendingDown className="w-5 h-5 mr-2" />
+                Buy NO @ {noPercentage}¢
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column - Chart and Details */}
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="p-6">
               <h2 className="text-xl font-bold mb-4">Price Chart</h2>
               <MarketChart marketId={market.id} height={400} />
             </Card>
 
-            {/* Tabs for Activity */}
             <Card className="p-6">
               <Tabs defaultValue="trades">
                 <TabsList className="w-full">
@@ -151,28 +247,32 @@ const MarketDetail = () => {
 
                 <TabsContent value="trades" className="mt-4">
                   <div className="space-y-2">
-                    {trades.slice(0, 10).map((trade) => (
-                      <div
-                        key={trade.id}
-                        className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <Badge
-                            variant={trade.side === "buy" ? "default" : "outline"}
-                            className={trade.side === "buy" ? "bg-success" : "bg-destructive"}
-                          >
-                            {trade.side.toUpperCase()}
-                          </Badge>
-                          <span className="font-medium">{trade.size.toFixed(2)} shares</span>
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold">{(trade.price * 100).toFixed(1)}¢</div>
-                          <div className="text-xs text-muted-foreground">
-                            {new Date(trade.timestamp).toLocaleTimeString()}
+                    {trades.length === 0 ? (
+                      <p className="text-center py-8 text-muted-foreground text-sm">No trades yet for this market.</p>
+                    ) : (
+                      trades.slice(0, 10).map((trade) => (
+                        <div
+                          key={trade.id}
+                          className="flex items-center justify-between p-3 rounded-lg hover:bg-secondary/30 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Badge
+                              variant={trade.side === "buy" ? "default" : "outline"}
+                              className={trade.side === "buy" ? "bg-success" : "bg-destructive"}
+                            >
+                              {trade.side.toUpperCase()}
+                            </Badge>
+                            <span className="font-medium">{trade.size.toFixed(2)} shares</span>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-semibold">{(trade.price * 100).toFixed(1)}¢</div>
+                            <div className="text-xs text-muted-foreground">
+                              {new Date(trade.timestamp).toLocaleTimeString()}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      ))
+                    )}
                   </div>
                 </TabsContent>
 
@@ -180,13 +280,12 @@ const MarketDetail = () => {
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-semibold mb-4">Open Leveraged Position</h3>
-                      <LeverageTradeWidget 
+                      <LeverageTradeWidget
                         marketId={market.id}
-                        currentPrice={market.yesPercentage / 100}
+                        currentPrice={market.yes_price}
                         marketName={market.title}
                       />
                     </div>
-                    
                     <div className="pt-6 border-t">
                       <h3 className="text-lg font-semibold mb-4">Your Positions</h3>
                       <LeveragePositionsList />
@@ -197,21 +296,52 @@ const MarketDetail = () => {
                 <TabsContent value="info" className="mt-4 space-y-4">
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-muted-foreground">Creator</span>
-                      <span className="font-medium">{market.creator}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Resolution Source</span>
-                      <span className="font-medium">{market.resolutionSource}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">End Date</span>
-                      <span className="font-medium">{market.endDate}</span>
-                    </div>
-                    <div className="flex justify-between">
                       <span className="text-muted-foreground">Venue</span>
-                      <span className="font-medium">{market.venue}</span>
+                      <span className="font-medium capitalize">{market.venue}</span>
                     </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Category</span>
+                      <span className="font-medium">{market.category}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Total Volume</span>
+                      <span className="font-medium">${formatVolume(market.volume_total)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Open Interest</span>
+                      <span className="font-medium">${formatVolume(market.open_interest)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">24h Trades</span>
+                      <span className="font-medium">{market.num_trades_24h}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Min Order</span>
+                      <span className="font-medium">${market.min_order_size}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Tick Size</span>
+                      <span className="font-medium">{market.tick_size}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Expires</span>
+                      <span className="font-medium">{new Date(market.expires_at).toLocaleString()}</span>
+                    </div>
+                    {market.resolution_date && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Resolution Date</span>
+                        <span className="font-medium">{new Date(market.resolution_date).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {market.external_url && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Source</span>
+                        <a href={market.external_url} target="_blank" rel="noopener noreferrer"
+                          className="font-medium text-primary hover:underline flex items-center gap-1">
+                          View on {market.venue} <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
                   </div>
                 </TabsContent>
               </Tabs>
@@ -234,13 +364,17 @@ const MarketDetail = () => {
         <MobileMarketDetail
           open={tradingModalOpen}
           onOpenChange={setTradingModalOpen}
-          market={market}
+          market={{
+            ...tradingMarket,
+            volume: formatVolume(market.volume_total),
+          }}
         />
       ) : (
-        <MarketDetailModal
+        <TradingModal
           open={tradingModalOpen}
           onOpenChange={setTradingModalOpen}
-          market={market}
+          market={tradingMarket}
+          preselectedSide={preselectedSide}
         />
       )}
     </div>
