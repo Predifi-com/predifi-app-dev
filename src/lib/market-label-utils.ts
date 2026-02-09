@@ -4,126 +4,187 @@
 
 /**
  * Extract a clean group title from an array of related market titles.
- * e.g. ["Will Trump nominate Judy Shelton as the next Fed chair?", "Will Trump nominate Kevin Warsh as the next Fed chair?"]
- *   → "Next Fed Chair"
  */
 export function extractGroupTitle(titles: string[]): string {
   if (titles.length === 0) return '';
   if (titles.length === 1) return titles[0];
 
-  // Clean titles: remove trailing punctuation for comparison
   const cleaned = titles.map(t => t.replace(/[?!.]+$/, '').trim());
-
-  // Word-level suffix matching (80% majority)
   const wordArrays = cleaned.map(t => t.split(/\s+/));
   const threshold = Math.ceil(titles.length * 0.8);
   const minWordCount = Math.min(...wordArrays.map(w => w.length));
 
+  // Word-level suffix matching (80% majority, tolerates singular/plural)
   let suffixWords = 0;
   for (let i = 1; i <= minWordCount - 1; i++) {
-    const word = wordArrays[0][wordArrays[0].length - i];
-    const matches = wordArrays.filter(w => w[w.length - i]?.toLowerCase() === word.toLowerCase()).length;
+    const refWord = wordArrays[0][wordArrays[0].length - i]?.toLowerCase();
+    const matches = wordArrays.filter(w => {
+      const word = w[w.length - i]?.toLowerCase();
+      return word === refWord || areSingularPlural(word, refWord);
+    }).length;
     if (matches >= threshold) suffixWords = i;
     else break;
   }
 
-  // Word-level prefix matching (strict)
+  // Word-level prefix matching (80% majority)
   let prefixWords = 0;
   for (let i = 0; i < minWordCount; i++) {
-    const word = wordArrays[0][i];
-    if (wordArrays.every(w => w[i]?.toLowerCase() === word.toLowerCase())) prefixWords = i + 1;
+    const refWord = wordArrays[0][i]?.toLowerCase();
+    const matches = wordArrays.filter(w => {
+      const word = w[i]?.toLowerCase();
+      return word === refWord || areSingularPlural(word, refWord);
+    }).length;
+    if (matches >= threshold) prefixWords = i + 1;
     else break;
   }
 
-  // Build title from suffix (preferred) or prefix
+  // Build title — try suffix first, then prefix
   let result = '';
 
   if (suffixWords >= 2) {
     const suffixPhrase = wordArrays[0].slice(-suffixWords).join(' ');
-    result = suffixPhrase.trim();
-    // Remove leading verbs/connectors to get the noun phrase
-    result = result.replace(/^(will\s+)?(win|reach|hit|make|be|become|get|have|take|go)\s+(the\s+)?/i, '').trim();
-    result = result.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be)\s+/i, '').trim();
+    result = cleanGroupPhrase(suffixPhrase);
   }
 
   if (result.length < 5 && prefixWords >= 2) {
     const prefixPhrase = wordArrays[0].slice(0, prefixWords).join(' ');
-    result = prefixPhrase.trim();
-    // Remove question starters
-    result = result.replace(/^(will|who will|what will|which|how will|when will|where will)\s+/i, '').trim();
-    // Remove trailing partial words/articles
-    result = result.replace(/\s+(the|a|an|to|in|of|as|be|is)$/i, '').trim();
+    result = cleanGroupPhrase(prefixPhrase);
   }
 
   // Capitalize
   if (result.length > 0) {
-    result = result.charAt(0).toUpperCase() + result.slice(1);
+    result = capitalizeFirst(result);
   }
 
   // Fallback: use first title cleaned
   if (result.length < 3) {
-    let fallback = titles[0].replace(/[?!.]+$/, '').trim();
-    fallback = fallback.replace(/^(will|who will|what will|which)\s+/i, '').trim();
-    return fallback.charAt(0).toUpperCase() + fallback.slice(1);
+    let fallback = cleaned[0];
+    fallback = fallback.replace(/^(will|who will|what will|which|how many)\s+/i, '').trim();
+    return capitalizeFirst(fallback);
   }
 
-  // Add "?" suffix for question-like titles
   return result;
+}
+
+/** Clean a raw phrase into a readable group title */
+function cleanGroupPhrase(phrase: string): string {
+  let r = phrase.trim();
+  // Strip leading question/verb patterns
+  r = r.replace(/^(will\s+)?(the\s+)?(there\s+)?(be\s+)?/i, '').trim();
+  r = r.replace(/^(win|reach|hit|make|become|get|have|take|go|happen)\s+(the\s+|in\s+)?/i, '').trim();
+  r = r.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be)\s+/i, '').trim();
+  // Strip leading units/measurements that aren't meaningful as titles
+  r = r.replace(/^(\d+\+?\s*)?(bps|bp|basis points?)\s+/i, '').trim();
+  // Strip leading connectors again after unit removal
+  r = r.replace(/^(after the|after|before the|before|by the|by|during the|during)\s+/i, (match) => {
+    // Keep temporal phrases if they form the core of the title
+    return match;
+  });
+  // Remove trailing articles/prepositions
+  r = r.replace(/\s+(the|a|an|to|in|of|as|be|is|by|there)$/i, '').trim();
+  // Remove question starters
+  r = r.replace(/^(will|who will|what will|which|how will|when will|where will|how many)\s+/i, '').trim();
+  return r;
 }
 
 /**
  * Extract short, unique labels from grouped market titles.
- * Strips common prefix, then trims trailing common phrases.
+ * Uses word-level prefix and suffix stripping to produce clean outcome labels.
  */
 export function extractUniqueSegments(titles: string[]): string[] {
   if (titles.length <= 1) return titles;
-  
-  const first = titles[0];
-  let prefixLen = 0;
-  for (let i = 0; i < first.length; i++) {
-    if (titles.every(t => t[i] === first[i])) prefixLen = i + 1;
+
+  const cleaned = titles.map(t => t.replace(/[?!.]+$/, '').trim());
+  const wordArrays = cleaned.map(t => t.split(/\s+/));
+  const threshold = Math.ceil(titles.length * 0.8);
+  const minWordCount = Math.min(...wordArrays.map(w => w.length));
+
+  // Find common prefix words (80% majority)
+  let prefixWords = 0;
+  for (let i = 0; i < minWordCount; i++) {
+    const refWord = wordArrays[0][i]?.toLowerCase();
+    const matches = wordArrays.filter(w => {
+      const word = w[i]?.toLowerCase();
+      return word === refWord || areSingularPlural(word, refWord);
+    }).length;
+    if (matches >= threshold) prefixWords = i + 1;
     else break;
   }
 
-  let segments = titles.map(t => {
-    let s = t.slice(prefixLen).trim();
-    s = s.replace(/^[,\s?]+/, '').trim();
-    return s;
-  });
-
-  // Find common suffix among ≥80% of segments (word-level)
-  const wordArrays = segments.map(s => s.split(/\s+/));
-  const threshold = Math.ceil(segments.length * 0.8);
-  const minLen = Math.min(...wordArrays.map(w => w.length));
+  // Find common suffix words (80% majority)
   let suffixWords = 0;
-  for (let i = 1; i <= minLen - 1; i++) {
-    const word = wordArrays[0][wordArrays[0].length - i];
-    const matches = wordArrays.filter(w => w[w.length - i] === word).length;
-    if (matches >= threshold) {
-      suffixWords = i;
-    } else break;
+  for (let i = 1; i <= minWordCount - prefixWords; i++) {
+    const refWord = wordArrays[0][wordArrays[0].length - i]?.toLowerCase();
+    const matches = wordArrays.filter(w => {
+      const word = w[w.length - i]?.toLowerCase();
+      return word === refWord || areSingularPlural(word, refWord);
+    }).length;
+    if (matches >= threshold) suffixWords = i;
+    else break;
   }
 
-  if (suffixWords > 0) {
-    segments = segments.map(s => {
-      const words = s.split(/\s+/);
-      const refWords = wordArrays[0];
-      const suffixMatch = Array.from({ length: suffixWords }, (_, i) => 
-        refWords[refWords.length - 1 - i]
-      ).reverse();
-      const segEnd = words.slice(-suffixWords);
-      if (segEnd.join(' ') === suffixMatch.join(' ')) {
-        return words.slice(0, words.length - suffixWords).join(' ');
-      }
-      return s;
-    });
-  }
+  // Build the common suffix phrase for context enrichment
+  const commonSuffix = suffixWords > 0
+    ? wordArrays[0].slice(-suffixWords).join(' ')
+    : '';
 
-  // Final cleanup
-  return segments.map((s, i) => {
-    s = s.replace(/[,\s?!.]+$/, '').trim();
-    s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim();
-    s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim();
-    return s || titles[i];
+  // Extract unique middle portion for each title
+  const segments = wordArrays.map((words, idx) => {
+    const start = prefixWords;
+    const end = words.length - suffixWords;
+
+    if (start >= end) return cleaned[idx];
+
+    let segment = words.slice(start, end).join(' ');
+
+    // Clean up leading connectors
+    segment = segment.replace(/^(the|a|an|be|there be|there)\s+/i, '').trim();
+    // Clean up trailing connectors
+    segment = segment.replace(/\s+(the|a|an|to|in|of|as|at|on|by|from|with)\s*$/i, '').trim();
+    segment = segment.replace(/[,\s]+$/, '').trim();
+
+    // If segment is too short (just a number or 1-2 chars), enrich with suffix context
+    if (segment.length <= 3 && commonSuffix) {
+      segment = enrichShortLabel(segment, commonSuffix);
+    }
+
+    return segment || cleaned[idx];
   });
+
+  return segments.map(s => capitalizeFirst(s));
+}
+
+/**
+ * Enrich a very short label (e.g. "2") with context from the common suffix.
+ * "2" + "Fed rate cuts happen in 2026" → "2 rate cuts"
+ */
+function enrichShortLabel(label: string, suffix: string): string {
+  // Extract the key noun phrase from the suffix
+  let context = suffix.trim();
+  // Remove temporal/verb parts
+  context = context.replace(/\b(happen|occurring|in|during|by|before|after|of)\b.*$/i, '').trim();
+  // Remove leading "Fed" type qualifiers for brevity
+  context = context.replace(/^(the\s+)?(fed|federal reserve)\s+/i, '').trim();
+  // Remove leading verbs
+  context = context.replace(/^(will\s+)?(be|have|get|make)\s+/i, '').trim();
+
+  if (context.length > 0 && context.length < 30) {
+    return `${label} ${context}`.trim();
+  }
+  return label;
+}
+
+function capitalizeFirst(s: string): string {
+  if (!s) return s;
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+function areSingularPlural(a: string, b: string): boolean {
+  if (!a || !b) return false;
+  const la = a.toLowerCase();
+  const lb = b.toLowerCase();
+  return (
+    la + 's' === lb || lb + 's' === la ||
+    la + 'es' === lb || lb + 'es' === la
+  );
 }
