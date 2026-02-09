@@ -60,7 +60,7 @@ export function OrderConfirmModal({
     { label: "Entry Price", value: `${effectivePrice.toFixed(1)}¢` },
     { label: "Est. Shares", value: isFinite(estimatedShares) ? estimatedShares.toFixed(1) : "—" },
     { label: "Max Payout", value: isFinite(estimatedShares) ? `$${estimatedShares.toFixed(2)}` : "—", highlight: true },
-    { label: "Possible Win", value: possibleWin > 0 ? `+$${possibleWin.toFixed(2)}` : "—", highlight: true },
+    { label: "Est. Profit", value: possibleWin > 0 ? `+$${possibleWin.toFixed(2)}` : "—", highlight: true },
   );
 
   if (liquidationPrice !== null) {
