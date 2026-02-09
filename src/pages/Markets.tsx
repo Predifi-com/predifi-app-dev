@@ -19,6 +19,7 @@ import { useSearchParams } from "react-router-dom";
 import { Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { extractGroupTitle, extractUniqueSegments } from "@/lib/market-label-utils";
+import { getEffectiveEndDate, isEffectivelyResolved } from "@/lib/market-date-utils";
 import type { PredifiMarket } from "@/services/predifi-api";
 
 /** Client-side subcategory filter based on title keywords or resolution timeframe */
@@ -45,7 +46,7 @@ function filterBySubcategory(markets: PredifiMarket[], category: string, sub: st
     };
     const [, rangeMax] = ranges[sub] || [0, Infinity];
     return markets.filter(m => {
-      const end = m.expires_at || m.resolution_date;
+      const end = getEffectiveEndDate(m);
       if (!end) return false;
       const diff = new Date(end).getTime() - now;
       return diff > 0 && diff <= rangeMax;
@@ -161,14 +162,9 @@ const Markets = () => {
   const searchFiltered = useMemo(() => {
     let filtered = markets;
 
-    // Filter out ended markets unless showClosed is on
+    // Filter out ended/resolved markets unless showClosed is on
     if (!showClosed) {
-      const now = Date.now();
-      filtered = filtered.filter(m => {
-        const end = m.expires_at || m.resolution_date;
-        if (!end) return true;
-        return new Date(end).getTime() > now;
-      });
+      filtered = filtered.filter(m => !isEffectivelyResolved(m));
     }
 
     const query = searchQuery.toLowerCase().trim();
@@ -231,7 +227,7 @@ const Markets = () => {
           totalVolume: totalVol,
           liquidity: groupMarkets.reduce((s, m) => s + (m.liquidity || 0), 0),
           volume24h: groupMarkets.reduce((s, m) => s + (m.volume_24h || 0), 0),
-          endDate: first.resolution_date || first.expires_at || '',
+          endDate: getEffectiveEndDate(first) || '',
           imageUrl: first.image_url || '',
           status: first.status,
           venue: first.venue || 'predifi',
@@ -263,7 +259,7 @@ const Markets = () => {
           liquidity: market.liquidity ?? 0,
           volume24h: market.volume_24h ?? 0,
           openInterest: market.open_interest ?? 0,
-          endDate: market.resolution_date || market.expires_at || '',
+          endDate: getEffectiveEndDate(market) || '',
           imageUrl: market.image_url || '',
           status: market.status,
           venue: market.venue || 'predifi',
