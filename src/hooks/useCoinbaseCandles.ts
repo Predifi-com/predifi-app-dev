@@ -94,14 +94,16 @@ function computeBaseline(candles: CoinbaseCandle[], timeframe: "hourly" | "daily
   return candles[0]?.open ?? candles[candles.length - 1].close;
 }
 
+/** Next full-hour boundary in UTC (e.g. 02:00, 03:00 UTC) */
 function getNextHourlyClose(): Date {
   const now = new Date();
   const next = new Date(now);
-  next.setMinutes(0, 0, 0);
-  next.setHours(next.getHours() + 1);
+  next.setUTCMinutes(0, 0, 0);
+  next.setUTCHours(next.getUTCHours() + 1);
   return next;
 }
 
+/** Next midnight UTC boundary (00:00 UTC) */
 function getNextDailyClose(): Date {
   const now = new Date();
   const next = new Date(now);
