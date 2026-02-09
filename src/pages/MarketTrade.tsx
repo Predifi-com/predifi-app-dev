@@ -134,7 +134,7 @@ const MarketTrade = () => {
 
         {/* ── Right (3 cols): order form + rules (fixed, no scroll) ── */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
-          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} />
+          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
           <div className="border-t border-border" />
           <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
         </div>
@@ -153,7 +153,7 @@ const MarketTrade = () => {
           </DrawerTrigger>
           <DrawerContent className="max-h-[85vh]">
             <div className="overflow-y-auto">
-              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} />
+              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
               <div className="border-t border-border" />
               <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
             </div>
