@@ -21,6 +21,7 @@ import { PlatformProvider } from "@/components/PlatformProvider";
 import { AnimatedRoutes } from "@/components/AnimatedRoutes";
 import { AdminFloatingButton } from "@/components/AdminFloatingButton";
 import { PredifiWalletProvider } from "@/contexts/PredifiWalletContext";
+import { WebSocketProvider } from "@/providers/WebSocketProvider";
 import { usePageTracking } from "@/hooks/usePageTracking";
 import { useEffect } from "react";
 
@@ -72,11 +73,13 @@ const App = () => (
           >
             <TooltipProvider>
               <PredifiWalletProvider>
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <AppContent />
-                </BrowserRouter>
+                <WebSocketProvider>
+                  <Toaster />
+                  <Sonner />
+                  <BrowserRouter>
+                    <AppContent />
+                  </BrowserRouter>
+                </WebSocketProvider>
               </PredifiWalletProvider>
             </TooltipProvider>
           </DynamicContextProvider>
