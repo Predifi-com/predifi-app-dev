@@ -18,7 +18,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
 import { formatDistanceToNow } from "date-fns";
 import { shortenAddress } from "@/lib/wallet-utils";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { toast } from "sonner";
 import { CommitmentHistory } from "@/components/CommitmentHistory";
 import { SEO } from "@/components/SEO";

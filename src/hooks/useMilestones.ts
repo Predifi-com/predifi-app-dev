@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { useWallet } from "./useWallet";
 import { toast } from "sonner";
 
@@ -54,7 +54,7 @@ export function useMilestones(totalCommitted: number) {
 
       if (error) throw error;
 
-      const achieved = new Set(data?.map(m => m.milestone_tier) || []);
+      const achieved = new Set<string>(data?.map((m: any) => m.milestone_tier as string) || []);
       setAchievedMilestones(achieved);
 
       const total = data?.reduce((sum, m) => sum + Number(m.reward_amount), 0) || 0;

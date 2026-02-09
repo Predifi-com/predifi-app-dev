@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { useArenaEligibility } from "@/hooks/useArenaEligibility";
 import { useEligibleCompetitions, type EligibleCompetition } from "@/hooks/useEligibleCompetitions";
 import { useWallet } from "@/hooks/useWallet";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { 
   Shield, 
   Wallet, 

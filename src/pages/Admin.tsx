@@ -15,7 +15,7 @@ import { ApiHealthMonitor } from "@/components/admin/ApiHealthMonitor";
 import { RateLimitMonitor } from "@/components/admin/RateLimitMonitor";
 import { ArenaAdminTab } from "@/components/admin/ArenaAdminTab";
 import { WalletButton } from "@/components/WalletButton";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "sonner";
 import { 

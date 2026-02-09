@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Trophy, Medal, Award, TrendingUp, Crown } from "lucide-react";
 import { SEO } from "@/components/SEO";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { ShareButton } from "@/components/ShareButton";
 
 interface LeaderboardEntry {
