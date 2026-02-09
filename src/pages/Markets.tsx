@@ -4,8 +4,8 @@ import CategoryNav from "@/components/CategoryNav";
 import MarketFilters from "@/components/MarketFilters";
 import { SEO } from "@/components/SEO";
 
-import { useState, useEffect, useMemo } from "react";
-import { useLocalMarkets } from "@/hooks/useLocalMarkets";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
+import { useMarketsFeed } from "@/hooks/useMarketsFeed";
 import { MinimalMarketCard } from "@/components/MinimalMarketCard";
 import { MarketCardSkeleton } from "@/components/MarketCardSkeleton";
 import { MarketFiltersSettings } from "@/components/MarketFiltersSettings";
@@ -15,81 +15,79 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { useSearchParams } from "react-router-dom";
-import { Search, X } from "lucide-react";
+import { Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { extractGroupTitle, extractUniqueSegments } from "@/lib/market-label-utils";
 
 const Markets = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  
+
+  // URL is the single source of truth for filters
+  const category = searchParams.get('category') || 'all';
+  const venue = searchParams.get('venue') || 'all';
+  const sortBy = searchParams.get('sort') || 'trending';
+  const searchQuery = searchParams.get('q') || '';
+
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
-  const [category, setCategory] = useState<string>(searchParams.get('category') || "all");
-  const [venue, setVenue] = useState<string>(searchParams.get('venue') || "all");
-  const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || "trending");
+  const [localSearch, setLocalSearch] = useState(searchQuery);
   const [minVolume, setMinVolume] = useState<number | undefined>(
     searchParams.get('minVolume') ? Number(searchParams.get('minVolume')) : undefined
   );
   const [density, setDensity] = useState<'compact' | 'comfortable' | 'spacious'>('comfortable');
 
-  // Fetch markets from local backend
-  const { markets, loading: isLoading, error } = useLocalMarkets();
+  // Debounce search input → URL
+  const searchTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const handleSearchChange = useCallback((value: string) => {
+    setLocalSearch(value);
+    clearTimeout(searchTimerRef.current);
+    searchTimerRef.current = setTimeout(() => {
+      updateParams({ q: value || undefined });
+    }, 300);
+  }, []);
 
-  // Display error if markets fail to load
+  // Helper to update URL params without circular effects
+  const updateParams = useCallback((updates: Record<string, string | undefined>) => {
+    setSearchParams(prev => {
+      const params = new URLSearchParams(prev);
+      Object.entries(updates).forEach(([key, val]) => {
+        if (val && val !== 'all' && val !== 'trending') {
+          params.set(key, val);
+        } else {
+          params.delete(key);
+        }
+      });
+      return params;
+    }, { replace: true });
+  }, [setSearchParams]);
+
+  // Fetch markets from API with server-side filtering
+  const { markets, isLoading, isLoadingMore, error, hasMore, loadMore, refresh, total } = useMarketsFeed({
+    category: category,
+    venue: venue,
+    status: showClosed ? undefined : 'active',
+    limit: 50,
+  });
+
   useEffect(() => {
     if (error) {
       toast.error("Failed to load markets from PrediFi API.");
     }
   }, [error]);
 
-  // Sync category from URL (CategoryNav drives this)
-  useEffect(() => {
-    const urlCat = searchParams.get('category') || 'all';
-    const urlVenue = searchParams.get('venue') || 'all';
-    if (urlCat !== category) setCategory(urlCat);
-    if (urlVenue !== venue) setVenue(urlVenue);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  // Sync filters to URL
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('q', searchQuery);
-    if (category && category !== 'all') params.set('category', category);
-    if (venue && venue !== 'all') params.set('venue', venue);
-    if (sortBy !== 'trending') params.set('sort', sortBy);
-    if (minVolume) params.set('minVolume', minVolume.toString());
-    setSearchParams(params, { replace: true });
-  }, [searchQuery, category, venue, sortBy, minVolume, setSearchParams]);
-
-  // Filter markets
-  const filteredMarkets = useMemo(() => {
+  // Client-side search filter (on top of server-side category/venue)
+  const searchFiltered = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    return markets.filter(market => {
-      // Search query
-      if (query && !market.title.toLowerCase().includes(query)) return false;
-      // Status
-      if (!showClosed && market.status !== 'active') return false;
-      // Venue
-      if (venue && venue !== 'all') {
-        if (market.venue?.toLowerCase() !== venue.toLowerCase()) return false;
-      }
-      // Category
-      if (category && category !== 'all') {
-        const marketCat = (market.category || '').toLowerCase();
-        if (marketCat !== category.toLowerCase()) return false;
-      }
-      return true;
-    });
-  }, [markets, searchQuery, showClosed, venue, category]);
+    if (!query) return markets;
+    return markets.filter(m => m.title.toLowerCase().includes(query));
+  }, [markets, searchQuery]);
 
-  // Group markets by group_id and transform into displayable items
+  // Group markets and build display items
   const displayMarkets = useMemo(() => {
-    const groupMap = new Map<string, typeof filteredMarkets>();
-    const standalone: typeof filteredMarkets = [];
+    const groupMap = new Map<string, typeof searchFiltered>();
+    const standalone: typeof searchFiltered = [];
 
-    filteredMarkets.forEach(market => {
+    searchFiltered.forEach(market => {
       if (market.outcomes && Array.isArray(market.outcomes) && market.outcomes.length > 2) {
         standalone.push(market);
         return;
@@ -105,7 +103,6 @@ const Markets = () => {
 
     const items: Array<{ type: 'binary' | 'multi_outcome'; market: any }> = [];
 
-    // Build grouped multi-outcome cards
     groupMap.forEach((groupMarkets, groupId) => {
       if (groupMarkets.length <= 2) {
         groupMarkets.forEach(m => standalone.push(m));
@@ -113,11 +110,7 @@ const Markets = () => {
       }
       const first = groupMarkets[0];
       const totalVol = groupMarkets.reduce((s, m) => s + (m.volume_total || m.volume_24h || 0), 0);
-      
-      // Extract clean group title
       const groupTitle = extractGroupTitle(groupMarkets.map(m => m.title));
-
-      // Extract short outcome labels
       const rawLabels = groupMarkets.map(m => (m as any).group_item_title || m.title);
       const shortLabels = extractUniqueSegments(rawLabels);
       const outcomes = groupMarkets.map((m, i) => ({
@@ -136,7 +129,6 @@ const Markets = () => {
           totalVolume: totalVol,
           liquidity: groupMarkets.reduce((s, m) => s + (m.liquidity || 0), 0),
           volume24h: groupMarkets.reduce((s, m) => s + (m.volume_24h || 0), 0),
-          openInterest: 0,
           endDate: first.resolution_date || first.expires_at || '',
           imageUrl: first.image_url || '',
           status: first.status,
@@ -150,7 +142,6 @@ const Markets = () => {
       });
     });
 
-    // Build standalone cards
     standalone.forEach(market => {
       const apiOutcomes = market.outcomes;
       const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length > 2;
@@ -185,7 +176,7 @@ const Markets = () => {
       });
     });
 
-    // Sort items
+    // Sort
     items.sort((a, b) => {
       const ma = a.market;
       const mb = b.market;
@@ -202,10 +193,7 @@ const Markets = () => {
           const now = Date.now();
           const endA = new Date(ma.endDate || '2099-01-01').getTime();
           const endB = new Date(mb.endDate || '2099-01-01').getTime();
-          // Only future dates; push past dates to end
-          const aFuture = endA > now ? endA : Infinity;
-          const bFuture = endB > now ? endB : Infinity;
-          return aFuture - bFuture;
+          return (endA > now ? endA : Infinity) - (endB > now ? endB : Infinity);
         }
         default:
           return 0;
@@ -213,16 +201,23 @@ const Markets = () => {
     });
 
     return items;
-  }, [filteredMarkets, sortBy]);
+  }, [searchFiltered, sortBy]);
 
-  // Refresh handler
-  const handleRefresh = async () => {
-    window.location.reload();
-    toast.success("Markets refreshed");
-  };
+  // Infinite scroll observer
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!sentinelRef.current || !hasMore) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) loadMore();
+      },
+      { rootMargin: '200px' }
+    );
+    observer.observe(sentinelRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
 
-  // Grid columns based on density
-  const gridColsClass = density === 'compact' 
+  const gridColsClass = density === 'compact'
     ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
     : density === 'spacious'
     ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
@@ -230,27 +225,26 @@ const Markets = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
-      <SEO 
+      <SEO
         title="Prediction Markets | Trade on Real-World Events | Predifi"
         description="Explore thousands of prediction markets on politics, crypto, sports & more. Trade with deep liquidity across Polymarket, Kalshi, Limitless and Predifi native markets."
       />
       <Header />
       <CategoryNav />
-      
+
       {/* Search & Filters Bar */}
       <div className="px-4 py-4 border-b border-border">
-        {/* Search Bar */}
         <div className="relative mb-3 max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Search markets..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            value={localSearch}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="pl-9 pr-9"
           />
-          {searchQuery && (
+          {localSearch && (
             <button
-              onClick={() => setSearchQuery("")}
+              onClick={() => handleSearchChange("")}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
@@ -259,11 +253,11 @@ const Markets = () => {
         </div>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="flex flex-wrap items-center gap-2 flex-1">
-            <MarketFilters 
+            <MarketFilters
               venue={venue}
               sortBy={sortBy}
-              onVenueChange={setVenue}
-              onSortChange={setSortBy}
+              onVenueChange={(v) => updateParams({ venue: v })}
+              onSortChange={(s) => updateParams({ sort: s })}
             />
             <div className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md">
               <Switch
@@ -284,11 +278,14 @@ const Markets = () => {
               onDensityChange={setDensity}
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            {total > 0 && (
+              <span className="text-xs text-muted-foreground">{total} markets</span>
+            )}
             <Button
               variant="outline"
               size="sm"
-              onClick={handleRefresh}
+              onClick={refresh}
               className="text-xs"
             >
               Refresh
@@ -296,16 +293,14 @@ const Markets = () => {
           </div>
         </div>
       </div>
-      
+
       {/* Main Content */}
       <div className="px-4 py-6">
         <div className={`grid ${gridColsClass} gap-4`}>
           {isLoading ? (
-            <>
-              {[1, 2, 3, 4, 5, 6].map((n) => (
-                <MarketCardSkeleton key={n} />
-              ))}
-            </>
+            [1, 2, 3, 4, 5, 6].map((n) => (
+              <MarketCardSkeleton key={n} />
+            ))
           ) : displayMarkets.length === 0 ? (
             <div className="col-span-full text-center py-12 text-muted-foreground">
               <p className="text-sm">No markets found.</p>
@@ -330,6 +325,15 @@ const Markets = () => {
             ))
           )}
         </div>
+
+        {/* Infinite scroll sentinel */}
+        {hasMore && (
+          <div ref={sentinelRef} className="flex justify-center py-8">
+            {isLoadingMore && (
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            )}
+          </div>
+        )}
       </div>
 
       <Footer />

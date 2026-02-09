@@ -13,55 +13,56 @@ export function extractGroupTitle(titles: string[]): string {
 
   const first = titles[0];
 
-  // Find common prefix
+  // Find common prefix (character-level, strict)
   let prefixLen = 0;
   for (let i = 0; i < first.length; i++) {
     if (titles.every(t => t[i] === first[i])) prefixLen = i + 1;
     else break;
   }
 
-  // Find common suffix
+  // Find common suffix using 80% majority (tolerates outliers like "no one before 2027")
+  const threshold = Math.ceil(titles.length * 0.8);
   let suffixLen = 0;
   for (let i = 0; i < first.length - prefixLen; i++) {
-    if (titles.every(t => t[t.length - 1 - i] === first[first.length - 1 - i])) suffixLen = i + 1;
+    const ch = first[first.length - 1 - i];
+    const matches = titles.filter(t => t[t.length - 1 - i] === ch).length;
+    if (matches >= threshold) suffixLen = i + 1;
     else break;
   }
 
-  // The common suffix is usually the best group title
-  // e.g. "as the next Fed chair?" → clean it up
-  let suffix = first.slice(first.length - suffixLen).trim();
-  suffix = suffix.replace(/^[,\s]+/, '').replace(/[?!.]+$/, '').trim();
+  // Try suffix first — it's usually the semantic group name
+  let result = '';
+  if (suffixLen > 3) {
+    result = first.slice(first.length - suffixLen).trim();
+    result = result.replace(/^[,\s]+/, '').replace(/[?!.]+$/, '').trim();
+    // Remove leading connectors
+    result = result.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be|win the|win)\s+/i, '').trim();
+  }
 
-  // Remove leading connectors
-  suffix = suffix.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be)\s+/i, '').trim();
-
-  // If suffix is too short or empty, try the prefix
-  if (suffix.length < 5) {
+  // If suffix too short, try prefix
+  if (result.length < 5) {
     let prefix = first.slice(0, prefixLen).trim();
     prefix = prefix.replace(/[,\s?]+$/, '').trim();
-    // Remove question starters
     prefix = prefix.replace(/^(will|who will|what will|which|how will|when will|where will)\s+/i, '').trim();
-    // Remove trailing partial words
     prefix = prefix.replace(/\s+\S{0,2}$/, '').trim();
-    
-    if (prefix.length > suffix.length && prefix.length >= 5) {
-      suffix = prefix;
+    if (prefix.length > result.length && prefix.length >= 5) {
+      result = prefix;
     }
   }
 
   // Capitalize first letter
-  if (suffix.length > 0) {
-    suffix = suffix.charAt(0).toUpperCase() + suffix.slice(1);
+  if (result.length > 0) {
+    result = result.charAt(0).toUpperCase() + result.slice(1);
   }
 
   // Fallback: use first title's question, cleaned
-  if (suffix.length < 3) {
+  if (result.length < 3) {
     let fallback = first.split('?')[0];
     fallback = fallback.replace(/^(will|who will|what will|which)\s+/i, '').trim();
     return fallback.charAt(0).toUpperCase() + fallback.slice(1);
   }
 
-  return suffix;
+  return result;
 }
 
 /**
