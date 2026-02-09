@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { SEO } from "@/components/SEO";
@@ -7,8 +8,9 @@ import { OrderBookMini } from "@/components/markets/OrderBookMini";
 import { MarketRules } from "@/components/markets/MarketRules";
 import { PositionManagement } from "@/components/markets/PositionManagement";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
 import { useCoinbaseCandles } from "@/hooks/useCoinbaseCandles";
 
 const ASSETS = ["BTC", "ETH", "SOL", "DOGE", "XRP"] as const;
@@ -47,6 +49,7 @@ function parseSlug(slug: string): { asset: string; timeframe: "hourly" | "daily"
 const MarketTrade = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
+  const [activeSide, setActiveSide] = useState<"yes" | "no">("yes");
 
   const parsed = slug ? parseSlug(slug) : null;
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
@@ -93,13 +96,13 @@ const MarketTrade = () => {
 
         {/* ── Center (6 cols): chart → orderbook → positions ── */}
         <div className="col-span-12 md:col-span-6 flex flex-col overflow-hidden">
-          {/* Chart — takes available space */}
+          {/* Chart */}
           <div className="flex-1 min-h-0 p-3">
             <CoinbaseMarketCard asset={selected.asset} timeframe={selected.timeframe} expanded />
           </div>
 
-          {/* Inline order book */}
-          <OrderBookMini yesProb={yesProb} />
+          {/* Collapsible side-by-side order book */}
+          <OrderBookMini yesProb={yesProb} side={activeSide} />
 
           {/* Positions table */}
           <PositionManagement />
@@ -114,15 +117,31 @@ const MarketTrade = () => {
 
         {/* ── Right (3 cols): order form + rules (fixed, no scroll) ── */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
-          {/* Order form — fixed height */}
-          <OrderForm asset={selected.asset} yesProb={yesProb} />
-
-          {/* Divider */}
+          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} />
           <div className="border-t border-border" />
-
-          {/* Market rules + TradingView link */}
           <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
         </div>
+      </div>
+
+      {/* ── Mobile FAB + Bottom Sheet for Order Form ── */}
+      <div className="lg:hidden fixed bottom-20 right-4 z-50">
+        <Drawer>
+          <DrawerTrigger asChild>
+            <Button
+              size="icon"
+              className="h-14 w-14 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
+            >
+              <ShoppingCart className="w-6 h-6" />
+            </Button>
+          </DrawerTrigger>
+          <DrawerContent className="max-h-[85vh]">
+            <div className="overflow-y-auto">
+              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} />
+              <div className="border-t border-border" />
+              <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
     </div>
   );
