@@ -53,6 +53,7 @@ const MarketTrade = () => {
   const navigate = useNavigate();
   const [activeSide, setActiveSide] = useState<"yes" | "no">("yes");
   const [clickedPrice, setClickedPrice] = useState<number | null>(null);
+  const [openPanel, setOpenPanel] = useState<"ai" | "orderbook" | null>(null);
 
   const parsed = slug ? parseSlug(slug) : null;
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
@@ -60,6 +61,10 @@ const MarketTrade = () => {
 
   const handleSelect = (m: { asset: string; timeframe: "hourly" | "daily" }) => {
     navigate(`/markets/${m.asset}-${m.timeframe}`, { replace: true });
+  };
+
+  const togglePanel = (panel: "ai" | "orderbook") => {
+    setOpenPanel((prev) => (prev === panel ? null : panel));
   };
 
   return (
@@ -111,12 +116,12 @@ const MarketTrade = () => {
             currentPrice={currentPrice}
             baseline={baseline}
             yesProb={yesProb}
+            isOpen={openPanel === "ai"}
+            onToggle={() => togglePanel("ai")}
           />
 
           {/* Collapsible side-by-side order book */}
-          <OrderBookMini yesProb={yesProb} side={activeSide} onPriceClick={setClickedPrice} />
-
-          {/* Positions table */}
+          <OrderBookMini yesProb={yesProb} side={activeSide} onPriceClick={setClickedPrice} isOpen={openPanel === "orderbook"} onToggle={() => togglePanel("orderbook")} />
           <PositionManagement />
 
           {/* Mobile back */}

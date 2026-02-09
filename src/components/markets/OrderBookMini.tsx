@@ -8,13 +8,16 @@ interface OrderBookMiniProps {
   yesProb: number;
   side?: "yes" | "no";
   onPriceClick?: (price: number) => void;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBookMiniProps) {
-  const [collapsed, setCollapsed] = useState(false);
-  const [bookSide, setBookSide] = useState<"yes" | "no">(side);
+export function OrderBookMini({ yesProb, side = "yes", onPriceClick, isOpen, onToggle }: OrderBookMiniProps) {
+  const isControlled = isOpen !== undefined;
+  const [internalCollapsed, setInternalCollapsed] = useState(false);
+  const collapsed = isControlled ? !isOpen : internalCollapsed;
 
-  // Sync external side prop
+  const [bookSide, setBookSide] = useState<"yes" | "no">(side);
   useMemo(() => setBookSide(side), [side]);
 
   const basePrice = bookSide === "yes" ? yesProb : 100 - yesProb;
@@ -34,9 +37,16 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBook
   const bids = generateLevels(basePrice, 5, false);
   const maxTotal = Math.max(...asks.map(a => a.total), ...bids.map(b => b.total));
 
+  const handleToggle = () => {
+    if (isControlled) {
+      onToggle?.();
+    } else {
+      setInternalCollapsed(!internalCollapsed);
+    }
+  };
+
   return (
     <div className="border-t border-border">
-      {/* Header with collapse toggle + side tabs */}
       <div className="px-3 py-1.5 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
@@ -49,14 +59,13 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBook
             </TabsList>
           </Tabs>
         </div>
-        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => setCollapsed(!collapsed)}>
+        <Button variant="ghost" size="icon" className="h-5 w-5" onClick={handleToggle}>
           {collapsed ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
         </Button>
       </div>
 
       {!collapsed && (
         <div className="px-3 pb-2">
-          {/* Column headers */}
           <div className="grid grid-cols-2 gap-3 mb-1">
             <div className="text-[9px] font-semibold text-muted-foreground uppercase flex justify-between px-1">
               <span>Price (Bid)</span><span>Size</span>
@@ -66,9 +75,7 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBook
             </div>
           </div>
 
-          {/* Side-by-side bids (left) and asks (right) */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Bids — left */}
             <div className="space-y-0.5">
               {bids.map((bid, i) => (
                 <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(bid.price)}>
@@ -79,7 +86,6 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBook
               ))}
             </div>
 
-            {/* Asks — right */}
             <div className="space-y-0.5">
               {asks.map((ask, i) => (
                 <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(ask.price)}>
@@ -91,7 +97,6 @@ export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBook
             </div>
           </div>
 
-          {/* Spread */}
           <div className="text-center py-1 border-t border-border/50 mt-1">
             <span className="text-[11px] font-bold tabular-nums">
               {bookSide === "yes" ? "Yes" : "No"} {basePrice.toFixed(1)}¢
