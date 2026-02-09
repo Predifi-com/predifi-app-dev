@@ -11,57 +11,63 @@ export function extractGroupTitle(titles: string[]): string {
   if (titles.length === 0) return '';
   if (titles.length === 1) return titles[0];
 
-  const first = titles[0];
+  // Clean titles: remove trailing punctuation for comparison
+  const cleaned = titles.map(t => t.replace(/[?!.]+$/, '').trim());
 
-  // Find common prefix (character-level, strict)
-  let prefixLen = 0;
-  for (let i = 0; i < first.length; i++) {
-    if (titles.every(t => t[i] === first[i])) prefixLen = i + 1;
-    else break;
-  }
-
-  // Find common suffix using 80% majority (tolerates outliers like "no one before 2027")
+  // Word-level suffix matching (80% majority)
+  const wordArrays = cleaned.map(t => t.split(/\s+/));
   const threshold = Math.ceil(titles.length * 0.8);
-  let suffixLen = 0;
-  for (let i = 0; i < first.length - prefixLen; i++) {
-    const ch = first[first.length - 1 - i];
-    const matches = titles.filter(t => t[t.length - 1 - i] === ch).length;
-    if (matches >= threshold) suffixLen = i + 1;
+  const minWordCount = Math.min(...wordArrays.map(w => w.length));
+
+  let suffixWords = 0;
+  for (let i = 1; i <= minWordCount - 1; i++) {
+    const word = wordArrays[0][wordArrays[0].length - i];
+    const matches = wordArrays.filter(w => w[w.length - i]?.toLowerCase() === word.toLowerCase()).length;
+    if (matches >= threshold) suffixWords = i;
     else break;
   }
 
-  // Try suffix first — it's usually the semantic group name
+  // Word-level prefix matching (strict)
+  let prefixWords = 0;
+  for (let i = 0; i < minWordCount; i++) {
+    const word = wordArrays[0][i];
+    if (wordArrays.every(w => w[i]?.toLowerCase() === word.toLowerCase())) prefixWords = i + 1;
+    else break;
+  }
+
+  // Build title from suffix (preferred) or prefix
   let result = '';
-  if (suffixLen > 3) {
-    result = first.slice(first.length - suffixLen).trim();
-    result = result.replace(/^[,\s]+/, '').replace(/[?!.]+$/, '').trim();
-    // Remove leading connectors
-    result = result.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be|win the|win)\s+/i, '').trim();
+
+  if (suffixWords >= 2) {
+    const suffixPhrase = wordArrays[0].slice(-suffixWords).join(' ');
+    result = suffixPhrase.trim();
+    // Remove leading verbs/connectors to get the noun phrase
+    result = result.replace(/^(will\s+)?(win|reach|hit|make|be|become|get|have|take|go)\s+(the\s+)?/i, '').trim();
+    result = result.replace(/^(as the|as|in the|in|of the|of|for the|for|to the|to|be the|be)\s+/i, '').trim();
   }
 
-  // If suffix too short, try prefix
-  if (result.length < 5) {
-    let prefix = first.slice(0, prefixLen).trim();
-    prefix = prefix.replace(/[,\s?]+$/, '').trim();
-    prefix = prefix.replace(/^(will|who will|what will|which|how will|when will|where will)\s+/i, '').trim();
-    prefix = prefix.replace(/\s+\S{0,2}$/, '').trim();
-    if (prefix.length > result.length && prefix.length >= 5) {
-      result = prefix;
-    }
+  if (result.length < 5 && prefixWords >= 2) {
+    const prefixPhrase = wordArrays[0].slice(0, prefixWords).join(' ');
+    result = prefixPhrase.trim();
+    // Remove question starters
+    result = result.replace(/^(will|who will|what will|which|how will|when will|where will)\s+/i, '').trim();
+    // Remove trailing partial words/articles
+    result = result.replace(/\s+(the|a|an|to|in|of|as|be|is)$/i, '').trim();
   }
 
-  // Capitalize first letter
+  // Capitalize
   if (result.length > 0) {
     result = result.charAt(0).toUpperCase() + result.slice(1);
   }
 
-  // Fallback: use first title's question, cleaned
+  // Fallback: use first title cleaned
   if (result.length < 3) {
-    let fallback = first.split('?')[0];
+    let fallback = titles[0].replace(/[?!.]+$/, '').trim();
     fallback = fallback.replace(/^(will|who will|what will|which)\s+/i, '').trim();
     return fallback.charAt(0).toUpperCase() + fallback.slice(1);
   }
 
+  // Add "?" suffix for question-like titles
   return result;
 }
 
