@@ -32,6 +32,8 @@ interface OrderEntry {
 const DEMO_POSITIONS: Position[] = [
   { id: "p1", market: "BTC Hourly", side: "YES", size: 50, entryPrice: 0.52, currentPrice: 0.61, pnl: 4.5, pnlPercent: 17.3 },
   { id: "p2", market: "ETH Daily", side: "NO", size: 25, entryPrice: 0.45, currentPrice: 0.38, pnl: 1.75, pnlPercent: 15.6 },
+  { id: "p3", market: "SOL Hourly", side: "YES", size: 40, entryPrice: 0.60, currentPrice: 0.54, pnl: -2.4, pnlPercent: -10.0 },
+  { id: "p4", market: "DOGE Daily", side: "NO", size: 15, entryPrice: 0.35, currentPrice: 0.42, pnl: -1.05, pnlPercent: -20.0 },
 ];
 
 const DEMO_ORDERS: OrderEntry[] = [
@@ -69,7 +71,7 @@ export function PositionManagement() {
         <TabsContent value="positions" className="mt-0">
           <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead>
+              <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="text-left p-2 pl-4 font-medium">Market</th>
                   <th className="text-left p-2 font-medium">Side</th>
@@ -114,7 +116,7 @@ export function PositionManagement() {
         <TabsContent value="orders" className="mt-0">
           <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead>
+              <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="text-left p-2 pl-4 font-medium">Market</th>
                   <th className="text-left p-2 font-medium">Type</th>
@@ -161,7 +163,7 @@ export function PositionManagement() {
         <TabsContent value="history" className="mt-0">
           <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
-              <thead>
+              <thead className="sticky top-0 bg-card z-10">
                 <tr className="border-b border-border text-muted-foreground">
                   <th className="text-left p-2 pl-4 font-medium">Market</th>
                   <th className="text-left p-2 font-medium">Type</th>
