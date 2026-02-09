@@ -148,44 +148,18 @@ const Markets = () => {
               </Link>
             </div>
 
-            <div className="space-y-3">
-              {/* Hourly section */}
-              <div className="flex items-center gap-2 pt-2">
-                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Hourly</span>
-                <div className="flex-1 border-t border-border/50" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {ASSETS.map((asset) => (
-                  <CoinbaseMarketCard
-                    key={`${asset}-hourly`}
-                    asset={asset}
-                    timeframe="hourly"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedMarket({ asset, timeframe: "hourly" });
-                    }}
-                  />
-                ))}
-              </div>
-
-              {/* Daily section */}
-              <div className="flex items-center gap-2 pt-4">
-                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Daily</span>
-                <div className="flex-1 border-t border-border/50" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                {ASSETS.map((asset) => (
-                  <CoinbaseMarketCard
-                    key={`${asset}-daily`}
-                    asset={asset}
-                    timeframe="daily"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setSelectedMarket({ asset, timeframe: "daily" });
-                    }}
-                  />
-                ))}
-              </div>
+            <div className="grid grid-cols-2 gap-3">
+              {ORDERED_MARKETS.map(({ asset, timeframe }) => (
+                <CoinbaseMarketCard
+                  key={`${asset}-${timeframe}`}
+                  asset={asset}
+                  timeframe={timeframe}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedMarket({ asset, timeframe });
+                  }}
+                />
+              ))}
             </div>
           </div>
 
