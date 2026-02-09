@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Wallet, TrendingUp, AlertCircle, ShieldAlert } from "lucide-react";
+import { Wallet, TrendingUp, AlertCircle, ShieldAlert, Zap } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useBalance } from "@/hooks/useBalance";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "sonner";
@@ -31,6 +32,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const [leverage, setLeverage] = useState(1);
   const [slippage] = useState(0.5);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [fastOrder, setFastOrder] = useState(false);
 
   const { balance } = useBalance();
   const { isConnected } = useWallet();
@@ -77,6 +79,10 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     onSideChange?.(s);
   };
 
+  const executeOrder = () => {
+    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}`);
+  };
+
   const handlePlaceOrder = () => {
     if (numAmount < MIN_ORDER) {
       toast.error(`Minimum order amount is $${MIN_ORDER}`);
@@ -86,12 +92,16 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       toast.error("Connect your wallet to place orders");
       return;
     }
-    setShowConfirm(true);
+    if (fastOrder) {
+      executeOrder();
+    } else {
+      setShowConfirm(true);
+    }
   };
 
   const handleConfirmOrder = () => {
     setShowConfirm(false);
-    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}`);
+    executeOrder();
   };
 
   return (
@@ -205,17 +215,19 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       )}
 
       {/* Fixed-height slot for limit price */}
-      <div className={cn("space-y-1", orderType !== "limit" && "invisible")}>
+      <div className={cn("space-y-1", orderType !== "limit" && "hidden")}>
         <Label className="text-[10px] text-muted-foreground">Limit Price (¢)</Label>
         <Input type="number" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} className="h-8 text-sm" placeholder={currentPrice.toFixed(1)} />
       </div>
 
       {/* Order summary */}
       <div className="rounded-md bg-muted/50 p-2 space-y-1 text-[10px]">
-        <div className="flex justify-between">
-          <span className="text-muted-foreground">Avg Price</span>
-          <span className="font-medium tabular-nums">{effectivePrice.toFixed(1)}¢</span>
-        </div>
+        {orderType === "limit" && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Limit Price</span>
+            <span className="font-medium tabular-nums">{limitPrice || currentPrice.toFixed(1)}¢</span>
+          </div>
+        )}
         {leverage > 1 && (
           <div className="flex justify-between">
             <span className="text-muted-foreground">Effective Size</span>
@@ -233,7 +245,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
           </span>
         </div>
         <div className="flex justify-between border-t border-border pt-1 mt-1">
-          <span className="text-muted-foreground font-semibold">Possible Win</span>
+          <span className="text-muted-foreground font-semibold">Est. Profit</span>
           <span className="font-bold tabular-nums text-emerald-500">
             {possibleWin > 0 ? `+$${possibleWin.toFixed(2)}` : "—"}
           </span>
@@ -247,6 +259,14 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
           </div>
         )}
       </div>
+
+      {/* Fast order toggle */}
+      <label className="flex items-center gap-2 cursor-pointer">
+        <Checkbox checked={fastOrder} onCheckedChange={(v) => setFastOrder(v === true)} className="h-3.5 w-3.5" />
+        <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+          <Zap className="w-2.5 h-2.5" /> Fast order (skip confirmation)
+        </span>
+      </label>
 
       <Button
         className={cn(

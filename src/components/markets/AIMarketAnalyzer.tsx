@@ -185,8 +185,13 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
               <span className="text-[10px] text-muted-foreground">Analyzing {asset} {timeframe} market…</span>
             </div>
           ) : analysis ? (
-            <div className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-line bg-muted/30 rounded-md p-2.5">
-              {analysis}
+            <div className="space-y-2">
+              <div className="text-[11px] leading-relaxed text-muted-foreground whitespace-pre-line bg-muted/30 rounded-md p-2.5">
+                {analysis}
+              </div>
+              <p className="text-[9px] text-muted-foreground/60 italic text-center px-2">
+                ⚠️ AI analysis is for informational purposes only and may be inaccurate. Not financial advice — always do your own research.
+              </p>
             </div>
           ) : (
             <div className="text-[10px] text-muted-foreground text-center py-2">
