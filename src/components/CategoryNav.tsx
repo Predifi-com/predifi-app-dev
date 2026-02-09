@@ -10,6 +10,7 @@ const categories = [
   { name: "Sports", value: "sports" },
   { name: "Crypto", value: "crypto" },
   { name: "Elections", value: "elections" },
+  { name: "Economics", value: "economics" },
   { name: "Pop Culture", value: "pop_culture" },
   { name: "Business", value: "business" },
   { name: "Science", value: "science" },
