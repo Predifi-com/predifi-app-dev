@@ -234,16 +234,14 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
         </div>
       )}
 
-      {/* SL/TP for leveraged positions */}
-      {isLeverage && leverage > 1 && (
-        <StopLossTakeProfit
-          entryPrice={effectivePrice}
-          leverage={leverage}
-          side={side}
-          liquidationPrice={liquidationPrice}
-          onValuesChange={setSlTp}
-        />
-      )}
+      {/* SL/TP — always visible */}
+      <StopLossTakeProfit
+        entryPrice={effectivePrice}
+        leverage={leverage}
+        side={side}
+        liquidationPrice={liquidationPrice}
+        onValuesChange={setSlTp}
+      />
 
       {/* Fixed-height slot for limit price */}
       <div className={cn("space-y-1", orderType !== "limit" && "hidden")}>
