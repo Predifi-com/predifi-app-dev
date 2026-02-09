@@ -24,16 +24,9 @@ export function MarketRules({ asset, timeframe }: MarketRulesProps) {
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Rules</span>
       </div>
 
-      <ul className="text-[11px] text-muted-foreground space-y-1.5 leading-relaxed">
-        <li>• Market resolves based on <span className="text-foreground font-medium">Coinbase {asset}-USD</span> spot price.</li>
-        <li>• Resolution at the end of the current {timeframe === "hourly" ? "hour" : "day"} (UTC).</li>
-        <li>• If the closing price is <span className="text-emerald-500 font-medium">above</span> the baseline, <span className="text-emerald-500 font-medium">YES</span> wins.</li>
-        <li>• If the closing price is <span className="text-red-500 font-medium">at or below</span> the baseline, <span className="text-red-500 font-medium">NO</span> wins.</li>
-        {timeframe === "daily" && (
-          <li>• Daily markets support up to <span className="text-foreground font-medium">5× leverage</span>.</li>
-        )}
-        <li>• All prices sourced from the Coinbase Exchange public API.</li>
-      </ul>
+      <p className="text-[11px] text-muted-foreground leading-relaxed">
+        This market resolves based on the <span className="text-foreground font-medium">Coinbase {asset}-USD</span> spot price at the end of the current {timeframe === "hourly" ? "hour" : "day"} (UTC). If the closing price is <span className="text-emerald-500 font-medium">above</span> the baseline, <span className="text-emerald-500 font-medium">YES</span> wins. If the closing price is <span className="text-red-500 font-medium">at or below</span> the baseline, <span className="text-red-500 font-medium">NO</span> wins.{timeframe === "daily" ? <> Daily markets support up to <span className="text-foreground font-medium">5× leverage</span>.</> : ""} All prices are sourced from the Coinbase Exchange public API.
+      </p>
 
       <a
         href={tvUrl}
