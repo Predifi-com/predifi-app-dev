@@ -236,6 +236,7 @@ const Markets = () => {
           trendingScore: first.trending_score || 0,
           marketType: 'multi_outcome' as const,
           outcomes,
+          isResolved: isEffectivelyResolved(first),
         },
       });
     });
@@ -270,6 +271,7 @@ const Markets = () => {
           outcomes: isMulti
             ? apiOutcomes.map((o: any) => ({ label: o.label || o.name, probability: Math.round((o.price ?? 0) * 100) }))
             : undefined,
+          isResolved: isEffectivelyResolved(market),
         },
       });
     });
@@ -424,6 +426,7 @@ const Markets = () => {
                     animationsEnabled={animationsEnabled}
                     marketType={item.market.marketType}
                     outcomes={item.market.outcomes}
+                    isResolved={item.market.isResolved}
                   />
                 ))
               )}
