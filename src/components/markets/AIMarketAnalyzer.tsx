@@ -5,7 +5,15 @@ import { ChevronDown, ChevronUp, Sparkles, Loader2, RefreshCw } from "lucide-rea
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-const AUTO_REFRESH_MS = 2 * 60 * 1000; // 2 minutes
+const AUTO_REFRESH_MS = 2 * 60 * 1000;
+const CACHE_TTL_MS = 2 * 60 * 1000; // cache valid for 2 minutes
+
+// Simple client-side cache
+const analysisCache = new Map<string, { analysis: string; timestamp: number }>();
+
+function getCacheKey(asset: string, timeframe: string) {
+  return `${asset}-${timeframe}`;
+}
 
 interface AIMarketAnalyzerProps {
   asset: string;
@@ -13,17 +21,35 @@ interface AIMarketAnalyzerProps {
   currentPrice: number;
   baseline: number;
   yesProb: number;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }
 
-export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yesProb }: AIMarketAnalyzerProps) {
-  const [collapsed, setCollapsed] = useState(true);
+export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yesProb, isOpen, onToggle }: AIMarketAnalyzerProps) {
+  // Use controlled state if provided, otherwise internal
+  const isControlled = isOpen !== undefined;
+  const [internalCollapsed, setInternalCollapsed] = useState(true);
+  const collapsed = isControlled ? !isOpen : internalCollapsed;
+
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const fetchAnalysis = useCallback(async () => {
+  const fetchAnalysis = useCallback(async (skipCache = false) => {
     if (isLoading) return;
+
+    // Check cache first
+    const key = getCacheKey(asset, timeframe);
+    if (!skipCache) {
+      const cached = analysisCache.get(key);
+      if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+        setAnalysis(cached.analysis);
+        setHasLoaded(true);
+        return;
+      }
+    }
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke("market-ai-analysis", {
@@ -36,8 +62,12 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
         return;
       }
 
-      setAnalysis(data?.analysis || "No analysis available.");
+      const result = data?.analysis || "No analysis available.";
+      setAnalysis(result);
       setHasLoaded(true);
+
+      // Store in cache
+      analysisCache.set(key, { analysis: result, timestamp: Date.now() });
     } catch (err: any) {
       console.error("AI analysis error:", err);
       toast.error("Failed to fetch AI analysis");
@@ -50,7 +80,7 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
   useEffect(() => {
     if (!collapsed && hasLoaded) {
       intervalRef.current = setInterval(() => {
-        fetchAnalysis();
+        fetchAnalysis(true); // skip cache on auto-refresh
       }, AUTO_REFRESH_MS);
     }
     return () => {
@@ -59,16 +89,21 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
   }, [collapsed, hasLoaded, fetchAnalysis]);
 
   const handleToggle = () => {
-    const next = !collapsed;
-    setCollapsed(next);
-    if (!next && !hasLoaded) {
+    if (isControlled) {
+      onToggle?.();
+    } else {
+      const next = !internalCollapsed;
+      setInternalCollapsed(next);
+      if (!next && !hasLoaded) fetchAnalysis();
+    }
+    // If opening and not loaded yet
+    if (collapsed && !hasLoaded) {
       fetchAnalysis();
     }
   };
 
   return (
     <div className="border-t border-border">
-      {/* Header */}
       <div className="px-3 py-1.5 flex items-center justify-between">
         <button onClick={handleToggle} className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
           <Sparkles className="w-3 h-3 text-primary" />
@@ -79,7 +114,7 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
         </button>
 
         {!collapsed && hasLoaded && (
-          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={fetchAnalysis} disabled={isLoading}>
+          <Button variant="ghost" size="icon" className="h-5 w-5" onClick={() => fetchAnalysis(true)} disabled={isLoading}>
             <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
           </Button>
         )}
