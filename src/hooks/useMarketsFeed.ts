@@ -30,6 +30,7 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
   const [error, setError] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [lastBatchSize, setLastBatchSize] = useState(0);
 
   const limit = params.limit || 50;
 
@@ -73,14 +74,20 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
       // Guard against stale responses
       if (fetchId !== fetchIdRef.current) return;
 
+      const fetchedMarkets = response.markets || [];
+      const batchSize = fetchedMarkets.length;
+
       if (append) {
-        setMarkets(prev => [...prev, ...response.markets]);
+        setMarkets(prev => [...prev, ...fetchedMarkets]);
       } else {
-        setMarkets(response.markets || []);
+        setMarkets(fetchedMarkets);
       }
 
+      setLastBatchSize(batchSize);
       setTotal(response.total || 0);
       setOffset(currentOffset);
+
+      
     } catch (err: any) {
       if (fetchId !== fetchIdRef.current) return;
       setError(err.message || "Failed to fetch markets");
@@ -92,7 +99,11 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
     }
   }, [limit]);
 
-  const hasMore = offset + limit < total;
+  // Use both total-based and batch-size-based check for hasMore
+  // If API returns reliable total, use it; otherwise check if batch was full
+  const hasMore = total > 0
+    ? (offset + limit < total)
+    : (lastBatchSize >= limit);
 
   const loadMore = useCallback(() => {
     if (hasMore && !isLoadingMore && !isLoading) {
