@@ -11,8 +11,11 @@ import { Link } from "react-router-dom";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-const CURATED_ASSETS = ["BTC", "ETH", "SOL", "DOGE", "XRP"];
-const ASSET_PATTERNS: Record<string, RegExp> = {
+// ── Fixed asset roster ──
+const CURATED_ASSETS = ["BTC", "ETH", "SOL", "DOGE", "XRP"] as const;
+type CuratedAsset = typeof CURATED_ASSETS[number];
+
+const ASSET_PATTERNS: Record<CuratedAsset, RegExp> = {
   BTC: /\bbtc\b|bitcoin/i,
   ETH: /\beth\b|ethereum/i,
   SOL: /\bsol\b|solana/i,
@@ -20,52 +23,69 @@ const ASSET_PATTERNS: Record<string, RegExp> = {
   XRP: /\bxrp\b|ripple/i,
 };
 
+// ── Fixed timeframe definitions ──
+type MarketTimeframe = "hourly" | "daily";
+
 /**
- * Classify market as hourly or daily based on expiry timeframe.
+ * Strictly classify a market into hourly or daily.
+ * Hourly: expires within 4 hours from now.
+ * Daily:  expires between 4 hours and 48 hours from now.
+ * Anything else is rejected (returns null).
  */
-function getTimeframe(market: PredifiMarket): "hourly" | "daily" | "other" {
+function classifyTimeframe(market: PredifiMarket): MarketTimeframe | null {
   const end = getEffectiveEndDate(market);
-  if (!end) return "other";
+  if (!end) return null;
   const diff = new Date(end).getTime() - Date.now();
-  if (diff <= 0) return "other";
-  if (diff <= 4 * 60 * 60 * 1000) return "hourly"; // ≤4h = hourly
-  if (diff <= 48 * 60 * 60 * 1000) return "daily";  // ≤48h = daily
-  return "other";
+  if (diff <= 0) return null; // expired
+  if (diff <= 4 * 60 * 60 * 1000) return "hourly";
+  if (diff <= 48 * 60 * 60 * 1000) return "daily";
+  return null; // too far out — not hourly or daily
+}
+
+/** A guaranteed slot in the curated grid */
+export interface CuratedSlot {
+  asset: CuratedAsset;
+  timeframe: MarketTimeframe;
+  isDaily: boolean;
+  market: PredifiMarket | null; // null = no matching market found
 }
 
 /**
- * Match markets to assets, picking one hourly + one daily per asset.
- * Total target: 10 cards (5 assets × 2 timeframes).
+ * Build a deterministic 10-slot grid: 5 assets × 2 timeframes.
+ *
+ * Rules:
+ * - Each slot is either filled or left as a placeholder.
+ * - A slot is NEVER filled with a market from the wrong timeframe.
+ * - When multiple candidates exist, pick highest volume.
+ * - Order: assets in roster order, hourly first then daily per asset.
  */
-function curateMarkets(allMarkets: PredifiMarket[]) {
-  const result: Array<{
-    market: PredifiMarket;
-    asset: string;
-    isDaily: boolean;
-  }> = [];
+function buildCuratedSlots(allMarkets: PredifiMarket[]): CuratedSlot[] {
+  const slots: CuratedSlot[] = [];
 
   for (const asset of CURATED_ASSETS) {
     const pattern = ASSET_PATTERNS[asset];
-    const matching = allMarkets.filter((m) => pattern.test(m.title) && m.status === "active");
 
-    const hourly = matching
-      .filter((m) => getTimeframe(m) === "hourly")
-      .sort((a, b) => (b.volume_total || 0) - (a.volume_total || 0));
+    // Find all active markets matching this asset
+    const matching = allMarkets.filter(
+      (m) => m.status === "active" && pattern.test(m.title)
+    );
 
-    const daily = matching
-      .filter((m) => getTimeframe(m) === "daily")
-      .sort((a, b) => (b.volume_total || 0) - (a.volume_total || 0));
+    for (const timeframe of ["hourly", "daily"] as MarketTimeframe[]) {
+      // Strictly filter by exact timeframe — no cross-contamination
+      const candidates = matching
+        .filter((m) => classifyTimeframe(m) === timeframe)
+        .sort((a, b) => (b.volume_total || 0) - (a.volume_total || 0));
 
-    if (hourly[0]) {
-      result.push({ market: hourly[0], asset, isDaily: false });
-    }
-    if (daily[0]) {
-      result.push({ market: daily[0], asset, isDaily: true });
+      slots.push({
+        asset,
+        timeframe,
+        isDaily: timeframe === "daily",
+        market: candidates[0] || null, // best match or empty slot
+      });
     }
   }
 
-  // Cap at 10
-  return result.slice(0, 10);
+  return slots; // Always exactly 10 slots
 }
 
 const Markets = () => {
@@ -93,21 +113,24 @@ const Markets = () => {
     fetch();
   }, []);
 
-  const curated = useMemo(() => curateMarkets(allMarkets), [allMarkets]);
+  const slots = useMemo(() => buildCuratedSlots(allMarkets), [allMarkets]);
+
+  // Only filled slots for trading layout
+  const filledSlots = useMemo(() => slots.filter((s) => s.market !== null) as (CuratedSlot & { market: PredifiMarket })[], [slots]);
 
   const tradingMarkets = useMemo(
     () =>
-      curated.map((c) => ({
-        id: c.market.id,
-        title: c.market.title,
-        yesPercentage: c.market.yes_price ?? 50,
-        noPercentage: c.market.no_price ?? 50,
-        totalVolume: c.market.volume_total || c.market.volume_24h || 0,
-        imageUrl: c.market.image_url || undefined,
-        endDate: getEffectiveEndDate(c.market) || undefined,
-        isDaily: c.isDaily,
+      filledSlots.map((s) => ({
+        id: s.market.id,
+        title: s.market.title,
+        yesPercentage: s.market.yes_price ?? 50,
+        noPercentage: s.market.no_price ?? 50,
+        totalVolume: s.market.volume_total || s.market.volume_24h || 0,
+        imageUrl: s.market.image_url || undefined,
+        endDate: getEffectiveEndDate(s.market) || undefined,
+        isDaily: s.isDaily,
       })),
-    [curated]
+    [filledSlots]
   );
 
   // If a market is selected, show trading layout
@@ -126,7 +149,7 @@ const Markets = () => {
     );
   }
 
-  // Default: curated grid
+  // Default: curated 10-slot grid
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0">
       <SEO title="Markets | Predifi" description="Trade prediction markets on crypto, sports, politics and more." />
@@ -148,29 +171,42 @@ const Markets = () => {
           </Link>
         </div>
 
-        {/* Market Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+        {/* Fixed 10-slot grid: 5 assets × 2 timeframes */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
           {isLoading ? (
-            Array.from({ length: 8 }, (_, i) => <MarketCardSkeleton key={i} />)
-          ) : curated.length === 0 ? (
-            <div className="col-span-full text-center py-16 text-muted-foreground">
-              <p className="text-sm">No active crypto markets found.</p>
-            </div>
+            Array.from({ length: 10 }, (_, i) => <MarketCardSkeleton key={i} />)
           ) : (
-            curated.map((c) => (
-              <MarketCardSimple
-                key={c.market.id}
-                id={c.market.id}
-                title={c.market.title}
-                yesPercentage={c.market.yes_price ?? 50}
-                noPercentage={c.market.no_price ?? 50}
-                totalVolume={c.market.volume_total || c.market.volume_24h || 0}
-                imageUrl={c.market.image_url || undefined}
-                endDate={getEffectiveEndDate(c.market) || undefined}
-                isDaily={c.isDaily}
-                onClick={() => setSelectedMarketId(c.market.id)}
-              />
-            ))
+            slots.map((slot) => {
+              if (slot.market) {
+                return (
+                  <MarketCardSimple
+                    key={`${slot.asset}-${slot.timeframe}`}
+                    id={slot.market.id}
+                    title={slot.market.title}
+                    yesPercentage={slot.market.yes_price ?? 50}
+                    noPercentage={slot.market.no_price ?? 50}
+                    totalVolume={slot.market.volume_total || slot.market.volume_24h || 0}
+                    imageUrl={slot.market.image_url || undefined}
+                    endDate={getEffectiveEndDate(slot.market) || undefined}
+                    isDaily={slot.isDaily}
+                    timeframeLabel={slot.timeframe === "hourly" ? "Hourly" : "Daily"}
+                    onClick={() => setSelectedMarketId(slot.market!.id)}
+                  />
+                );
+              }
+
+              // Empty placeholder slot
+              return (
+                <div
+                  key={`${slot.asset}-${slot.timeframe}`}
+                  className="rounded-xl border border-dashed border-border/60 bg-muted/20 p-4 flex flex-col items-center justify-center min-h-[160px]"
+                >
+                  <span className="text-xs font-bold text-muted-foreground uppercase">{slot.asset}</span>
+                  <span className="text-[10px] text-muted-foreground/60 mt-1 uppercase">{slot.timeframe}</span>
+                  <span className="text-[10px] text-muted-foreground/40 mt-2">No market available</span>
+                </div>
+              );
+            })
           )}
         </div>
       </div>

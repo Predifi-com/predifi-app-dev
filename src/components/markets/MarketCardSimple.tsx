@@ -13,6 +13,8 @@ export interface MarketCardSimpleProps {
   endDate?: string;
   isSelected?: boolean;
   isDaily?: boolean;
+  /** e.g. "Hourly" or "Daily" — shown as a tag on the card */
+  timeframeLabel?: string;
   onClick?: () => void;
 }
 
@@ -45,6 +47,7 @@ export function MarketCardSimple({
   endDate,
   isSelected = false,
   isDaily = false,
+  timeframeLabel,
   onClick,
 }: MarketCardSimpleProps) {
   const timeLeft = useMemo(() => (endDate ? formatTimeLeft(endDate) : null), [endDate]);
@@ -59,15 +62,25 @@ export function MarketCardSimple({
           : "border-border bg-card hover:border-primary/40"
       )}
     >
-      {/* Leverage badge for daily markets */}
-      {isDaily && (
-        <div className="absolute top-3 right-3 z-10">
+      {/* Timeframe + Leverage badges */}
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-1">
+        {timeframeLabel && (
+          <span className={cn(
+            "inline-flex items-center text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded border",
+            isDaily
+              ? "bg-primary/10 text-primary border-primary/20"
+              : "bg-muted text-muted-foreground border-border"
+          )}>
+            {timeframeLabel}
+          </span>
+        )}
+        {isDaily && (
           <span className="inline-flex items-center gap-1 text-[9px] font-medium uppercase tracking-wider px-1.5 py-0.5 rounded bg-warning/10 text-warning border border-warning/20">
             <TrendingUp className="w-2.5 h-2.5" />
             Leverage
           </span>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Image + Title */}
       <div className="flex gap-3 mb-3">
