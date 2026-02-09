@@ -2,7 +2,9 @@ import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { SEO } from "@/components/SEO";
 import { CoinbaseMarketCard } from "@/components/markets/CoinbaseMarketCard";
-import { TradingOrderbook } from "@/components/markets/TradingOrderbook";
+import { OrderForm } from "@/components/markets/OrderForm";
+import { OrderBookMini } from "@/components/markets/OrderBookMini";
+import { MarketRules } from "@/components/markets/MarketRules";
 import { PositionManagement } from "@/components/markets/PositionManagement";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft } from "lucide-react";
@@ -61,37 +63,26 @@ const MarketTrade = () => {
         description="Trade prediction markets."
       />
       <Header />
+
       {/* 12-column grid: 3 / 6 / 3 — fills remaining viewport */}
       <div className="flex-1 min-h-0 grid grid-cols-12 overflow-hidden">
-        {/* Left (3 cols): scrollable market list */}
+
+        {/* ── Left (3 cols): scrollable market list ── */}
         <div className="col-span-3 border-r border-border hidden md:flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => navigate("/markets")}
-            >
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/markets")}>
               <ArrowLeft className="w-4 h-4" />
             </Button>
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-              Markets
-            </span>
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Markets</span>
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-1">
               {ORDERED_MARKETS.map(({ asset, timeframe }) => (
-                <div
-                  key={`${asset}-${timeframe}`}
-                  onClick={() => handleSelect({ asset, timeframe })}
-                  className="cursor-pointer"
-                >
+                <div key={`${asset}-${timeframe}`} onClick={() => handleSelect({ asset, timeframe })} className="cursor-pointer">
                   <CoinbaseMarketCard
                     asset={asset}
                     timeframe={timeframe}
-                    isSelected={
-                      selected.asset === asset && selected.timeframe === timeframe
-                    }
+                    isSelected={selected.asset === asset && selected.timeframe === timeframe}
                     compact
                   />
                 </div>
@@ -100,32 +91,37 @@ const MarketTrade = () => {
           </ScrollArea>
         </div>
 
-        {/* Center (6 cols): chart + positions — no scroll */}
+        {/* ── Center (6 cols): chart → orderbook → positions ── */}
         <div className="col-span-12 md:col-span-6 flex flex-col overflow-hidden">
-          <div className="flex-1 min-h-0 p-4">
-            <CoinbaseMarketCard
-              asset={selected.asset}
-              timeframe={selected.timeframe}
-              expanded
-            />
+          {/* Chart — takes available space */}
+          <div className="flex-1 min-h-0 p-3">
+            <CoinbaseMarketCard asset={selected.asset} timeframe={selected.timeframe} expanded />
           </div>
+
+          {/* Inline order book */}
+          <OrderBookMini yesProb={yesProb} />
+
+          {/* Positions table */}
           <PositionManagement />
+
           {/* Mobile back */}
           <div className="md:hidden p-3 border-t border-border">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate("/markets")}
-              className="w-full"
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate("/markets")} className="w-full">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Markets
             </Button>
           </div>
         </div>
 
-        {/* Right (3 cols): orderbook — no scroll */}
+        {/* ── Right (3 cols): order form + rules (fixed, no scroll) ── */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
-          <TradingOrderbook asset={selected.asset} yesProb={yesProb} />
+          {/* Order form — fixed height */}
+          <OrderForm asset={selected.asset} yesProb={yesProb} />
+
+          {/* Divider */}
+          <div className="border-t border-border" />
+
+          {/* Market rules + TradingView link */}
+          <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
         </div>
       </div>
     </div>
