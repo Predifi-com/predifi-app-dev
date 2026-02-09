@@ -7,9 +7,10 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 interface OrderBookMiniProps {
   yesProb: number;
   side?: "yes" | "no";
+  onPriceClick?: (price: number) => void;
 }
 
-export function OrderBookMini({ yesProb, side = "yes" }: OrderBookMiniProps) {
+export function OrderBookMini({ yesProb, side = "yes", onPriceClick }: OrderBookMiniProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [bookSide, setBookSide] = useState<"yes" | "no">(side);
 
@@ -70,7 +71,7 @@ export function OrderBookMini({ yesProb, side = "yes" }: OrderBookMiniProps) {
             {/* Bids — left */}
             <div className="space-y-0.5">
               {bids.map((bid, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden">
+                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(bid.price)}>
                   <div className="absolute left-0 top-0 bottom-0 bg-emerald-500/8" style={{ width: `${(bid.total / maxTotal) * 100}%` }} />
                   <span className="text-emerald-500 font-medium tabular-nums relative z-10">{bid.price.toFixed(1)}¢</span>
                   <span className="text-muted-foreground tabular-nums relative z-10">{bid.size}</span>
@@ -81,7 +82,7 @@ export function OrderBookMini({ yesProb, side = "yes" }: OrderBookMiniProps) {
             {/* Asks — right */}
             <div className="space-y-0.5">
               {asks.map((ask, i) => (
-                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden">
+                <div key={i} className="flex justify-between items-center text-[10px] py-0.5 px-1 rounded relative overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onPriceClick?.(ask.price)}>
                   <div className="absolute right-0 top-0 bottom-0 bg-red-500/8" style={{ width: `${(ask.total / maxTotal) * 100}%` }} />
                   <span className="text-red-500 font-medium tabular-nums relative z-10">{ask.price.toFixed(1)}¢</span>
                   <span className="text-muted-foreground tabular-nums relative z-10">{ask.size}</span>

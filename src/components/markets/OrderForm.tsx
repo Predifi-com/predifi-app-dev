@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -9,14 +9,23 @@ interface OrderFormProps {
   asset: string;
   yesProb: number;
   onSideChange?: (side: "yes" | "no") => void;
+  externalLimitPrice?: number | null;
 }
 
-export function OrderForm({ asset, yesProb, onSideChange }: OrderFormProps) {
+export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: OrderFormProps) {
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("10");
   const [limitPrice, setLimitPrice] = useState("");
   const [slippage] = useState(0.5);
+
+  // When a price is clicked in the order book, switch to limit and fill
+  useEffect(() => {
+    if (externalLimitPrice != null) {
+      setLimitPrice(externalLimitPrice.toFixed(1));
+      setOrderType("limit");
+    }
+  }, [externalLimitPrice]);
 
   const noProb = 100 - yesProb;
   const currentPrice = side === "yes" ? yesProb : noProb;

@@ -52,6 +52,7 @@ const MarketTrade = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
   const [activeSide, setActiveSide] = useState<"yes" | "no">("yes");
+  const [clickedPrice, setClickedPrice] = useState<number | null>(null);
 
   const parsed = slug ? parseSlug(slug) : null;
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
@@ -113,7 +114,7 @@ const MarketTrade = () => {
           />
 
           {/* Collapsible side-by-side order book */}
-          <OrderBookMini yesProb={yesProb} side={activeSide} />
+          <OrderBookMini yesProb={yesProb} side={activeSide} onPriceClick={setClickedPrice} />
 
           {/* Positions table */}
           <PositionManagement />
@@ -128,7 +129,7 @@ const MarketTrade = () => {
 
         {/* ── Right (3 cols): order form + rules (fixed, no scroll) ── */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
-          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} />
+          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} />
           <div className="border-t border-border" />
           <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
         </div>
@@ -147,7 +148,7 @@ const MarketTrade = () => {
           </DrawerTrigger>
           <DrawerContent className="max-h-[85vh]">
             <div className="overflow-y-auto">
-              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} />
+              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} />
               <div className="border-t border-border" />
               <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
             </div>
