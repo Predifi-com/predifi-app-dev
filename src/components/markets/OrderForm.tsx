@@ -5,10 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { Wallet, TrendingUp, AlertCircle } from "lucide-react";
+import { Wallet, TrendingUp, AlertCircle, ShieldAlert } from "lucide-react";
 import { useBalance } from "@/hooks/useBalance";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "sonner";
+import { OrderConfirmModal } from "./OrderConfirmModal";
 
 const MIN_ORDER = 3;
 const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
@@ -29,6 +30,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const [limitPrice, setLimitPrice] = useState("");
   const [leverage, setLeverage] = useState(1);
   const [slippage] = useState(0.5);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   const { balance } = useBalance();
   const { isConnected } = useWallet();
@@ -54,6 +56,16 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const estimatedShares = effectivePrice > 0 ? effectiveAmount / (effectivePrice / 100) : 0;
   const possibleWin = isFinite(estimatedShares) ? Math.max(0, estimatedShares - numAmount) : 0;
 
+  // Liquidation price: margin = numAmount, position size = effectiveAmount
+  // Liquidated when loss = margin → price moves (1/leverage)*100 against entry
+  const liquidationPrice = useMemo(() => {
+    if (leverage <= 1) return null;
+    const movePercent = (1 / leverage) * effectivePrice;
+    // If buying YES, liq is below entry; if NO, liq is above entry
+    const liq = side === "yes" ? effectivePrice - movePercent : effectivePrice + movePercent;
+    return Math.max(0, Math.min(100, liq));
+  }, [leverage, effectivePrice, side]);
+
   const amountError = useMemo(() => {
     if (numAmount > 0 && numAmount < MIN_ORDER) return `Minimum order is $${MIN_ORDER}`;
     if (balance && numAmount > (balance.available_balance ?? balance.total_balance ?? Infinity)) return "Insufficient balance";
@@ -74,6 +86,11 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       toast.error("Connect your wallet to place orders");
       return;
     }
+    setShowConfirm(true);
+  };
+
+  const handleConfirmOrder = () => {
+    setShowConfirm(false);
     toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}`);
   };
 
@@ -221,6 +238,14 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
             {possibleWin > 0 ? `+$${possibleWin.toFixed(2)}` : "—"}
           </span>
         </div>
+        {liquidationPrice !== null && (
+          <div className="flex justify-between">
+            <span className="text-destructive flex items-center gap-1 font-semibold">
+              <ShieldAlert className="w-2.5 h-2.5" /> Liq. Price
+            </span>
+            <span className="font-bold tabular-nums text-destructive">{liquidationPrice.toFixed(1)}¢</span>
+          </div>
+        )}
       </div>
 
       <Button
@@ -237,6 +262,22 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       <p className="text-[9px] text-muted-foreground text-center">
         Slippage tolerance: {slippage}% · Min order: ${MIN_ORDER}
       </p>
+
+      <OrderConfirmModal
+        open={showConfirm}
+        onOpenChange={setShowConfirm}
+        onConfirm={handleConfirmOrder}
+        side={side}
+        orderType={orderType}
+        amount={numAmount}
+        leverage={leverage}
+        effectiveAmount={effectiveAmount}
+        effectivePrice={effectivePrice}
+        estimatedShares={estimatedShares}
+        possibleWin={possibleWin}
+        liquidationPrice={liquidationPrice}
+        asset={asset}
+      />
     </div>
   );
 }
