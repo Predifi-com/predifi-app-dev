@@ -2,6 +2,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryNav from "@/components/CategoryNav";
 import MarketFilters from "@/components/MarketFilters";
+import { CategorySidebar } from "@/components/CategorySidebar";
 import { SEO } from "@/components/SEO";
 
 import { useState, useMemo, useCallback, useRef, useEffect } from "react";
@@ -18,6 +19,86 @@ import { useSearchParams } from "react-router-dom";
 import { Search, X, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { extractGroupTitle, extractUniqueSegments } from "@/lib/market-label-utils";
+import type { PredifiMarket } from "@/services/predifi-api";
+
+/** Client-side subcategory filter based on title keywords or resolution timeframe */
+function filterBySubcategory(markets: PredifiMarket[], category: string, sub: string): PredifiMarket[] {
+  if (category === 'crypto') {
+    // Filter by resolution timeframe (time until expiry)
+    const now = Date.now();
+    const maxMs: Record<string, number> = {
+      '15m': 15 * 60 * 1000,
+      '1h': 60 * 60 * 1000,
+      '4h': 4 * 60 * 60 * 1000,
+      '1d': 24 * 60 * 60 * 1000,
+      '1w': 7 * 24 * 60 * 60 * 1000,
+    };
+    const max = maxMs[sub];
+    if (!max) return markets;
+    // For ranges: 15m = 0-15m, 1h = 15m-1h, 4h = 1h-4h, etc.
+    const ranges: Record<string, [number, number]> = {
+      '15m': [0, 15 * 60 * 1000],
+      '1h': [0, 60 * 60 * 1000],
+      '4h': [0, 4 * 60 * 60 * 1000],
+      '1d': [0, 24 * 60 * 60 * 1000],
+      '1w': [0, 7 * 24 * 60 * 60 * 1000],
+    };
+    const [, rangeMax] = ranges[sub] || [0, Infinity];
+    return markets.filter(m => {
+      const end = m.expires_at || m.resolution_date;
+      if (!end) return false;
+      const diff = new Date(end).getTime() - now;
+      return diff > 0 && diff <= rangeMax;
+    });
+  }
+
+  // Keyword-based filtering for other categories
+  const keywordMap: Record<string, Record<string, RegExp>> = {
+    sports: {
+      nba: /\b(nba|basketball)\b/i,
+      nfl: /\b(nfl|football|super bowl)\b/i,
+      mlb: /\b(mlb|baseball)\b/i,
+      soccer: /\b(soccer|football|premier league|la liga|champions league|mls|fifa|world cup)\b/i,
+      ufc: /\b(ufc|mma|boxing|fight)\b/i,
+      tennis: /\b(tennis|wimbledon|us open|french open|australian open)\b/i,
+      f1: /\b(f1|formula|grand prix|racing)\b/i,
+    },
+    politics: {
+      us: /\b(us|united states|american|congress|senate|president|trump|biden)\b/i,
+      global: /\b(eu|china|india|uk|russia|global|world|international)\b/i,
+      congress: /\b(congress|senate|house|representative|speaker)\b/i,
+      elections: /\b(election|vote|ballot|primary|caucus)\b/i,
+    },
+    elections: {
+      us: /\b(us|united states|american)\b/i,
+      global: /\b(eu|uk|india|global|world)\b/i,
+    },
+    economics: {
+      fed: /\b(fed|federal reserve|interest rate|fomc|powell)\b/i,
+      gdp: /\b(gdp|growth|output)\b/i,
+      inflation: /\b(inflation|cpi|pce|prices)\b/i,
+    },
+    pop_culture: {
+      movies: /\b(movie|film|box office|oscar|academy)\b/i,
+      music: /\b(music|album|grammy|spotify|song|artist)\b/i,
+      awards: /\b(award|emmy|grammy|oscar|golden globe)\b/i,
+    },
+    business: {
+      tech: /\b(apple|google|microsoft|meta|amazon|nvidia|openai|ai)\b/i,
+      ipos: /\b(ipo|listing|public offering)\b/i,
+      earnings: /\b(earnings|revenue|profit|quarterly)\b/i,
+    },
+    science: {
+      space: /\b(space|nasa|spacex|mars|moon|rocket|satellite)\b/i,
+      climate: /\b(climate|weather|temperature|carbon|emissions)\b/i,
+      health: /\b(health|vaccine|fda|drug|medical|covid)\b/i,
+    },
+  };
+
+  const pattern = keywordMap[category]?.[sub];
+  if (!pattern) return markets;
+  return markets.filter(m => pattern.test(m.title));
+}
 
 const Markets = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,6 +108,7 @@ const Markets = () => {
   const venue = searchParams.get('venue') || 'all';
   const sortBy = searchParams.get('sort') || 'trending';
   const searchQuery = searchParams.get('q') || '';
+  const subcategory = searchParams.get('sub') || 'all';
 
   const [animationsEnabled, setAnimationsEnabled] = useState(false);
   const [showClosed, setShowClosed] = useState(false);
@@ -93,8 +175,14 @@ const Markets = () => {
     if (query) {
       filtered = filtered.filter(m => m.title.toLowerCase().includes(query));
     }
+
+    // Subcategory filtering
+    if (subcategory && subcategory !== 'all') {
+      filtered = filterBySubcategory(filtered, category, subcategory);
+    }
+
     return filtered;
-  }, [markets, searchQuery, showClosed]);
+  }, [markets, searchQuery, showClosed, subcategory, category]);
 
   // Group markets and build display items
   const displayMarkets = useMemo(() => {
@@ -246,108 +334,115 @@ const Markets = () => {
       <Header />
       <CategoryNav />
 
-      {/* Search & Filters Bar */}
-      <div className="px-4 py-4 border-b border-border">
-        <div className="relative mb-3 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder="Search markets..."
-            value={localSearch}
-            onChange={(e) => handleSearchChange(e.target.value)}
-            className="pl-9 pr-9"
-          />
-          {localSearch && (
-            <button
-              onClick={() => handleSearchChange("")}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2 flex-1">
-            <MarketFilters
-              venue={venue}
-              sortBy={sortBy}
-              onVenueChange={(v) => updateParams({ venue: v })}
-              onSortChange={(s) => updateParams({ sort: s })}
-            />
-            <div className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md">
-              <Switch
-                id="show-closed-markets"
-                checked={showClosed}
-                onCheckedChange={setShowClosed}
-              />
-              <Label htmlFor="show-closed-markets" className="text-xs cursor-pointer whitespace-nowrap">
-                Show closed
-              </Label>
-            </div>
-            <MarketFiltersSettings
-              animationsEnabled={animationsEnabled}
-              onAnimationsChange={setAnimationsEnabled}
-              minVolume={minVolume}
-              onMinVolumeChange={setMinVolume}
-              density={density}
-              onDensityChange={setDensity}
-            />
-          </div>
-          <div className="flex items-center gap-3">
-            {total > 0 && (
-              <span className="text-xs text-muted-foreground">{total} markets</span>
-            )}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={refresh}
-              className="text-xs"
-            >
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </div>
+      {/* Sidebar + Main Content */}
+      <div className="flex flex-1">
+        <CategorySidebar />
 
-      {/* Main Content */}
-      <div className="px-4 py-6">
-        <div className={`grid ${gridColsClass} gap-4`}>
-          {isLoading ? (
-            [1, 2, 3, 4, 5, 6].map((n) => (
-              <MarketCardSkeleton key={n} />
-            ))
-          ) : displayMarkets.length === 0 ? (
-            <div className="col-span-full text-center py-12 text-muted-foreground">
-              <p className="text-sm">No markets found.</p>
-            </div>
-          ) : (
-            displayMarkets.map((item) => (
-              <MinimalMarketCard
-                key={item.market.id}
-                id={item.market.id}
-                title={item.market.title}
-                description={item.market.description}
-                yesPercentage={item.market.yesPercentage}
-                noPercentage={item.market.noPercentage}
-                totalVolume={item.market.totalVolume}
-                venue={item.market.venue}
-                imageUrl={item.market.imageUrl}
-                endDate={item.market.endDate}
-                animationsEnabled={animationsEnabled}
-                marketType={item.market.marketType}
-                outcomes={item.market.outcomes}
+        <div className="flex-1 min-w-0">
+          {/* Search & Filters Bar */}
+          <div className="px-4 py-4 border-b border-border">
+            <div className="relative mb-3 max-w-md">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="Search markets..."
+                value={localSearch}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                className="pl-9 pr-9"
               />
-            ))
-          )}
-        </div>
+              {localSearch && (
+                <button
+                  onClick={() => handleSearchChange("")}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2 flex-1">
+                <MarketFilters
+                  venue={venue}
+                  sortBy={sortBy}
+                  onVenueChange={(v) => updateParams({ venue: v })}
+                  onSortChange={(s) => updateParams({ sort: s })}
+                />
+                <div className="flex items-center gap-2 px-3 py-1.5 border border-border rounded-md">
+                  <Switch
+                    id="show-closed-markets"
+                    checked={showClosed}
+                    onCheckedChange={setShowClosed}
+                  />
+                  <Label htmlFor="show-closed-markets" className="text-xs cursor-pointer whitespace-nowrap">
+                    Show closed
+                  </Label>
+                </div>
+                <MarketFiltersSettings
+                  animationsEnabled={animationsEnabled}
+                  onAnimationsChange={setAnimationsEnabled}
+                  minVolume={minVolume}
+                  onMinVolumeChange={setMinVolume}
+                  density={density}
+                  onDensityChange={setDensity}
+                />
+              </div>
+              <div className="flex items-center gap-3">
+                {total > 0 && (
+                  <span className="text-xs text-muted-foreground">{total} markets</span>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refresh}
+                  className="text-xs"
+                >
+                  Refresh
+                </Button>
+              </div>
+            </div>
+          </div>
 
-        {/* Infinite scroll sentinel */}
-        {hasMore && (
-          <div ref={sentinelRef} className="flex justify-center py-8">
-            {isLoadingMore && (
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          {/* Market Grid */}
+          <div className="px-4 py-6">
+            <div className={`grid ${gridColsClass} gap-4`}>
+              {isLoading ? (
+                [1, 2, 3, 4, 5, 6].map((n) => (
+                  <MarketCardSkeleton key={n} />
+                ))
+              ) : displayMarkets.length === 0 ? (
+                <div className="col-span-full text-center py-12 text-muted-foreground">
+                  <p className="text-sm">No markets found.</p>
+                </div>
+              ) : (
+                displayMarkets.map((item) => (
+                  <MinimalMarketCard
+                    key={item.market.id}
+                    id={item.market.id}
+                    title={item.market.title}
+                    description={item.market.description}
+                    yesPercentage={item.market.yesPercentage}
+                    noPercentage={item.market.noPercentage}
+                    totalVolume={item.market.totalVolume}
+                    venue={item.market.venue}
+                    imageUrl={item.market.imageUrl}
+                    endDate={item.market.endDate}
+                    animationsEnabled={animationsEnabled}
+                    marketType={item.market.marketType}
+                    outcomes={item.market.outcomes}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Infinite scroll sentinel */}
+            {hasMore && (
+              <div ref={sentinelRef} className="flex justify-center py-8">
+                {isLoadingMore && (
+                  <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                )}
+              </div>
             )}
           </div>
-        )}
+        </div>
       </div>
 
       <Footer />
