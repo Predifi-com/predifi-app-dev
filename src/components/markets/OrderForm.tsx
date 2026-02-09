@@ -1,23 +1,37 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Wallet, TrendingUp, AlertCircle } from "lucide-react";
+import { useBalance } from "@/hooks/useBalance";
+import { useWallet } from "@/hooks/useWallet";
+import { toast } from "sonner";
+
+const MIN_ORDER = 3;
+const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
 
 interface OrderFormProps {
   asset: string;
   yesProb: number;
   onSideChange?: (side: "yes" | "no") => void;
   externalLimitPrice?: number | null;
+  /** Whether this market supports leverage (daily markets) */
+  isLeverage?: boolean;
 }
 
-export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: OrderFormProps) {
+export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, isLeverage = false }: OrderFormProps) {
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("10");
   const [limitPrice, setLimitPrice] = useState("");
+  const [leverage, setLeverage] = useState(1);
   const [slippage] = useState(0.5);
+
+  const { balance } = useBalance();
+  const { isConnected } = useWallet();
 
   // When a price is clicked in the order book, switch to limit and fill
   useEffect(() => {
@@ -27,18 +41,60 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: 
     }
   }, [externalLimitPrice]);
 
+  // Reset leverage when switching to non-leverage market
+  useEffect(() => {
+    if (!isLeverage) setLeverage(1);
+  }, [isLeverage]);
+
   const noProb = 100 - yesProb;
   const currentPrice = side === "yes" ? yesProb : noProb;
-  const estimatedShares = Number(amount) / (currentPrice / 100);
+  const effectivePrice = orderType === "limit" && limitPrice ? Number(limitPrice) : currentPrice;
+  const numAmount = Number(amount) || 0;
+  const effectiveAmount = numAmount * leverage;
+  const estimatedShares = effectivePrice > 0 ? effectiveAmount / (effectivePrice / 100) : 0;
+  const possibleWin = isFinite(estimatedShares) ? Math.max(0, estimatedShares - numAmount) : 0;
+
+  const amountError = useMemo(() => {
+    if (numAmount > 0 && numAmount < MIN_ORDER) return `Minimum order is $${MIN_ORDER}`;
+    if (balance && numAmount > (balance.available_balance ?? balance.total_balance ?? Infinity)) return "Insufficient balance";
+    return null;
+  }, [numAmount, balance]);
 
   const handleSideChange = (s: "yes" | "no") => {
     setSide(s);
     onSideChange?.(s);
   };
 
+  const handlePlaceOrder = () => {
+    if (numAmount < MIN_ORDER) {
+      toast.error(`Minimum order amount is $${MIN_ORDER}`);
+      return;
+    }
+    if (!isConnected) {
+      toast.error("Connect your wallet to place orders");
+      return;
+    }
+    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}`);
+  };
+
   return (
     <div className="p-3 space-y-3">
       <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Order</span>
+
+      {/* Balance display */}
+      <div className="flex items-center justify-between rounded-md bg-muted/50 px-2.5 py-1.5">
+        <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+          <Wallet className="w-3 h-3" />
+          <span>Balance</span>
+        </div>
+        <span className="text-xs font-bold tabular-nums">
+          {isConnected
+            ? balance
+              ? `$${(balance.available_balance ?? balance.total_balance ?? 0).toFixed(2)}`
+              : "Loading..."
+            : "—"}
+        </span>
+      </div>
 
       <Tabs value={orderType} onValueChange={(v) => setOrderType(v as "market" | "limit")}>
         <TabsList className="w-full h-7">
@@ -68,7 +124,20 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: 
 
       <div className="space-y-1">
         <Label className="text-[10px] text-muted-foreground">Amount (USDC)</Label>
-        <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} className="h-8 text-sm" placeholder="0.00" />
+        <Input
+          type="number"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+          className={cn("h-8 text-sm", amountError && "border-destructive")}
+          placeholder="0.00"
+          min={MIN_ORDER}
+        />
+        {amountError && (
+          <p className="text-[9px] text-destructive flex items-center gap-1">
+            <AlertCircle className="w-2.5 h-2.5" />
+            {amountError}
+          </p>
+        )}
         <div className="flex gap-1">
           {[5, 10, 25, 50].map((v) => (
             <Button key={v} variant="outline" size="sm" className="h-5 text-[9px] flex-1 px-0" onClick={() => setAmount(String(v))}>
@@ -78,17 +147,64 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: 
         </div>
       </div>
 
+      {/* Leverage selector — only for daily markets */}
+      {isLeverage && (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <TrendingUp className="w-3 h-3" />
+              Leverage
+            </Label>
+            <span className="text-xs font-bold text-primary">{leverage}x</span>
+          </div>
+          <div className="flex gap-1">
+            {LEVERAGE_OPTIONS.map((lev) => (
+              <Button
+                key={lev}
+                variant={leverage === lev ? "default" : "outline"}
+                size="sm"
+                className={cn("h-6 text-[10px] flex-1 px-0", leverage === lev && "bg-primary text-primary-foreground")}
+                onClick={() => setLeverage(lev)}
+              >
+                {lev}x
+              </Button>
+            ))}
+          </div>
+          <Slider
+            value={[leverage]}
+            onValueChange={([v]) => setLeverage(v)}
+            min={1}
+            max={5}
+            step={1}
+            className="py-1"
+          />
+          {leverage > 1 && (
+            <p className="text-[9px] text-warning flex items-center gap-1">
+              <AlertCircle className="w-2.5 h-2.5" />
+              {leverage}x leverage increases both potential gains and losses
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Fixed-height slot for limit price */}
       <div className={cn("space-y-1", orderType !== "limit" && "invisible")}>
         <Label className="text-[10px] text-muted-foreground">Limit Price (¢)</Label>
         <Input type="number" value={limitPrice} onChange={(e) => setLimitPrice(e.target.value)} className="h-8 text-sm" placeholder={currentPrice.toFixed(1)} />
       </div>
 
+      {/* Order summary */}
       <div className="rounded-md bg-muted/50 p-2 space-y-1 text-[10px]">
         <div className="flex justify-between">
           <span className="text-muted-foreground">Avg Price</span>
-          <span className="font-medium tabular-nums">{currentPrice.toFixed(1)}¢</span>
+          <span className="font-medium tabular-nums">{effectivePrice.toFixed(1)}¢</span>
         </div>
+        {leverage > 1 && (
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Effective Size</span>
+            <span className="font-medium tabular-nums">${effectiveAmount.toFixed(2)}</span>
+          </div>
+        )}
         <div className="flex justify-between">
           <span className="text-muted-foreground">Est. Shares</span>
           <span className="font-medium tabular-nums">{isFinite(estimatedShares) ? estimatedShares.toFixed(1) : "—"}</span>
@@ -99,6 +215,12 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: 
             ${isFinite(estimatedShares) ? estimatedShares.toFixed(2) : "—"}
           </span>
         </div>
+        <div className="flex justify-between border-t border-border pt-1 mt-1">
+          <span className="text-muted-foreground font-semibold">Possible Win</span>
+          <span className="font-bold tabular-nums text-emerald-500">
+            {possibleWin > 0 ? `+$${possibleWin.toFixed(2)}` : "—"}
+          </span>
+        </div>
       </div>
 
       <Button
@@ -106,11 +228,15 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice }: 
           "w-full h-9 text-xs font-bold",
           side === "yes" ? "bg-emerald-500 hover:bg-emerald-600 text-white" : "bg-red-500 hover:bg-red-600 text-white"
         )}
+        onClick={handlePlaceOrder}
+        disabled={!!amountError || numAmount <= 0}
       >
         {orderType === "market" ? "Place Market Order" : "Place Limit Order"}
       </Button>
 
-      <p className="text-[9px] text-muted-foreground text-center">Slippage tolerance: {slippage}%</p>
+      <p className="text-[9px] text-muted-foreground text-center">
+        Slippage tolerance: {slippage}% · Min order: ${MIN_ORDER}
+      </p>
     </div>
   );
 }
