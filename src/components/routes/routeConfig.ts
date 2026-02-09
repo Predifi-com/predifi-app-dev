@@ -8,6 +8,7 @@ const Leaderboard = lazy(() => import("@/pages/Leaderboard"));
 const Rewards = lazy(() => import("@/pages/Rewards"));
 const Games = lazy(() => import("@/pages/Games"));
 const Markets = lazy(() => import("@/pages/Markets"));
+const MarketTrade = lazy(() => import("@/pages/MarketTrade"));
 const MarketsPlus = lazy(() => import("@/pages/MarketsPlus"));
 const MarketDetail = lazy(() => import("@/pages/MarketDetail"));
 const Portfolio = lazy(() => import("@/pages/Portfolio"));
@@ -58,6 +59,7 @@ export const publicRoutes: RouteConfig[] = [
   { path: "/terms-of-service", component: TermsOfService, transition: "page" },
   // Markets browsing - publicly accessible
   { path: "/markets", component: Markets, transition: "page" },
+  { path: "/markets/:slug", component: MarketTrade, skeleton: "detail", transition: "slide" },
   { path: "/markets-plus", component: MarketsPlus, transition: "page" },
   { path: "/markets/:id", component: MarketDetail, skeleton: "detail", transition: "slide" },
   { path: "/leaderboard", component: Leaderboard, skeleton: "table", transition: "page" },
