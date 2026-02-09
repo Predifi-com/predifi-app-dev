@@ -27,6 +27,7 @@ interface MinimalMarketCardProps {
   animationsEnabled?: boolean;
   marketType?: "binary" | "multi_outcome";
   outcomes?: MarketOutcome[];
+  isResolved?: boolean;
 }
 
 function formatVolume(volume: number): string {
@@ -69,6 +70,7 @@ export function MinimalMarketCard({
   animationsEnabled = true,
   marketType = "binary",
   outcomes,
+  isResolved = false,
 }: MinimalMarketCardProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
@@ -101,8 +103,17 @@ export function MinimalMarketCard({
         whileHover={animationsEnabled ? { y: -2 } : {}}
         transition={{ duration: 0.18 }}
         onClick={() => setModalOpen(true)}
-        className="relative group cursor-pointer rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all flex flex-col h-full"
+        className={`relative group cursor-pointer rounded-2xl border border-border bg-card p-5 hover:border-primary/40 hover:shadow-md transition-all flex flex-col h-full ${isResolved ? 'opacity-60' : ''}`}
       >
+        {/* Ended badge overlay */}
+        {isResolved && (
+          <div className="absolute top-3 left-3 z-10">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border">
+              Ended
+            </span>
+          </div>
+        )}
+
         {/* AI Analysis icon */}
         <button
           onClick={(e) => {
