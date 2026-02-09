@@ -25,13 +25,10 @@ function formatVolume(v: number): string {
   return v.toFixed(0);
 }
 
-/** API returns yes_price/no_price as 0-100 range. Normalize to cents display. */
+/** API returns yes_price/no_price in 0-100 percentage range. Round to display as cents. */
 function priceToCents(price: number | null | undefined): number {
   if (price == null) return 50;
-  // If price > 1, it's already in percentage (0-100) format
-  if (price > 1) return Math.round(price);
-  // If price <= 1, it's in decimal (0-1) format
-  return Math.round(price * 100);
+  return Math.round(price);
 }
 
 const MarketDetail = () => {
