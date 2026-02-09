@@ -22,6 +22,17 @@ export function MarketChart({ marketId, height = 400 }: MarketChartProps) {
     );
   }
 
+  if (!data || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center text-muted-foreground text-sm" style={{ height }}>
+        <div className="text-center">
+          <p className="font-medium mb-1">No chart data available</p>
+          <p className="text-xs">Price history will appear once trades are recorded.</p>
+        </div>
+      </div>
+    );
+  }
+
   const chartData = data.map((d) => ({
     time: new Date(d.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     price: d.close,
