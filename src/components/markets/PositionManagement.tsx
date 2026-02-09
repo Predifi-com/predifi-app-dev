@@ -67,7 +67,7 @@ export function PositionManagement() {
         </div>
 
         <TabsContent value="positions" className="mt-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
@@ -112,7 +112,7 @@ export function PositionManagement() {
         </TabsContent>
 
         <TabsContent value="orders" className="mt-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
@@ -159,7 +159,7 @@ export function PositionManagement() {
         </TabsContent>
 
         <TabsContent value="history" className="mt-0">
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto max-h-40 overflow-y-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-border text-muted-foreground">
