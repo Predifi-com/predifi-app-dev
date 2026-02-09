@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, TrendingUp, TrendingDown, ExternalLink, Loader2 } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown, ExternalLink, Lock } from "lucide-react";
 import { MarketChart } from "@/components/MarketChart";
 import { OrderbookWidget } from "@/components/OrderbookWidget";
 import { TradingModal } from "@/components/TradingModal";
@@ -16,8 +16,6 @@ import { LoadingSpinner } from "@/components/LoadingSpinner";
 import { useTradeHistory } from "@/hooks/useTradeHistory";
 import { useActivityTracking } from "@/hooks/useActivityTracking";
 import { useWebSocket } from "@/providers/WebSocketProvider";
-import LeverageTradeWidget from "@/components/LeverageTradeWidget";
-import LeveragePositionsList from "@/components/LeveragePositionsList";
 import { predifiApi, type PredifiMarket } from "@/services/predifi-api";
 import type { WebSocketEvent, MarketUpdateEvent } from "@/services/websocket";
 
@@ -25,6 +23,15 @@ function formatVolume(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
   return v.toFixed(0);
+}
+
+/** API returns yes_price/no_price as 0-100 range. Normalize to cents display. */
+function priceToCents(price: number | null | undefined): number {
+  if (price == null) return 50;
+  // If price > 1, it's already in percentage (0-100) format
+  if (price > 1) return Math.round(price);
+  // If price <= 1, it's in decimal (0-1) format
+  return Math.round(price * 100);
 }
 
 const MarketDetail = () => {
@@ -36,7 +43,6 @@ const MarketDetail = () => {
   const isMobile = useIsMobile();
   const { service } = useWebSocket();
 
-  // Real API data
   const [market, setMarket] = useState<PredifiMarket | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,7 +70,6 @@ const MarketDetail = () => {
   useEffect(() => {
     if (!id || !market) return;
 
-    // Subscribe to market channel for real-time updates
     service.subscribeToMarkets(['markets', 'orderbook', 'trades'], [market.venue_market_id || id]);
 
     const unsubscribe = service.subscribe(`market:${id}`, (event: WebSocketEvent) => {
@@ -135,14 +140,16 @@ const MarketDetail = () => {
     );
   }
 
-  const yesPercentage = Math.round(market.yes_price * 100);
-  const noPercentage = Math.round(market.no_price * 100);
+  const yesCents = priceToCents(market.yes_price);
+  const noCents = priceToCents(market.no_price);
+  const isPredifi = market.venue === 'predifi';
 
   const tradingMarket = {
     id: market.id,
     title: market.title,
-    yesPercentage,
-    noPercentage,
+    yesPercentage: yesCents,
+    noPercentage: noCents,
+    venue: market.venue,
   };
 
   return (
@@ -150,7 +157,6 @@ const MarketDetail = () => {
       <Header />
 
       <div className="container mx-auto px-4 py-6">
-        {/* Back Button */}
         <Button variant="ghost" onClick={() => navigate(-1)} className="mb-4">
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back to Markets
@@ -169,7 +175,7 @@ const MarketDetail = () => {
               </div>
               <h1 className="text-3xl font-bold mb-2">{market.title}</h1>
               {market.description && (
-                <p className="text-muted-foreground">{market.description}</p>
+                <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: market.description }} />
               )}
             </div>
             {market.external_url && (
@@ -214,7 +220,7 @@ const MarketDetail = () => {
                 onClick={() => handleTrade("yes")}
               >
                 <TrendingUp className="w-5 h-5 mr-2" />
-                Buy YES @ {yesPercentage}¢
+                Buy YES @ {yesCents}¢
               </Button>
               <Button
                 size="lg"
@@ -222,7 +228,7 @@ const MarketDetail = () => {
                 onClick={() => handleTrade("no")}
               >
                 <TrendingDown className="w-5 h-5 mr-2" />
-                Buy NO @ {noPercentage}¢
+                Buy NO @ {noCents}¢
               </Button>
             </div>
           )}
@@ -230,7 +236,6 @@ const MarketDetail = () => {
 
         {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left Column */}
           <div className="lg:col-span-2 space-y-6">
             <Card className="p-6">
               <h2 className="text-xl font-bold mb-4">Price Chart</h2>
@@ -241,7 +246,7 @@ const MarketDetail = () => {
               <Tabs defaultValue="trades">
                 <TabsList className="w-full">
                   <TabsTrigger value="trades" className="flex-1">Recent Trades</TabsTrigger>
-                  <TabsTrigger value="leverage" className="flex-1">Leverage Trading</TabsTrigger>
+                  <TabsTrigger value="leverage" className="flex-1">Margin Trading</TabsTrigger>
                   <TabsTrigger value="info" className="flex-1">Market Info</TabsTrigger>
                 </TabsList>
 
@@ -276,21 +281,24 @@ const MarketDetail = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="leverage" className="mt-4 space-y-6">
-                  <div className="space-y-4">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-4">Open Leveraged Position</h3>
-                      <LeverageTradeWidget
-                        marketId={market.id}
-                        currentPrice={market.yes_price}
-                        marketName={market.title}
-                      />
+                <TabsContent value="leverage" className="mt-4">
+                  {isPredifi ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      <p className="font-medium mb-2">Margin Trading</p>
+                      <p>Open leveraged positions on this market via the trade modal.</p>
+                      <Button className="mt-4" onClick={() => handleTrade("yes")}>
+                        Open Trade Modal
+                      </Button>
                     </div>
-                    <div className="pt-6 border-t">
-                      <h3 className="text-lg font-semibold mb-4">Your Positions</h3>
-                      <LeveragePositionsList />
+                  ) : (
+                    <div className="text-center py-12">
+                      <Lock className="w-10 h-10 mx-auto mb-4 text-muted-foreground/50" />
+                      <p className="font-semibold text-lg mb-1">Margin Trading available only on Predifi</p>
+                      <p className="text-muted-foreground text-sm">
+                        For <span className="capitalize font-medium">{market.venue}</span> markets — coming soon.
+                      </p>
                     </div>
-                  </div>
+                  )}
                 </TabsContent>
 
                 <TabsContent value="info" className="mt-4 space-y-4">

@@ -22,7 +22,8 @@ export function OrderbookWidget({ marketId, compact = false }: OrderbookWidgetPr
   if (!orderbook) {
     return (
       <div className="text-center py-8 text-muted-foreground text-sm">
-        No orderbook data available
+        <p className="font-medium mb-1">No orderbook data</p>
+        <p className="text-xs">Live order book will populate when WebSocket data streams in.</p>
       </div>
     );
   }
