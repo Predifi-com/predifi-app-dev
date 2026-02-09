@@ -165,7 +165,7 @@ export function MinimalMarketCard({
                       i === 0 ? "text-emerald-500" : "text-muted-foreground"
                     }`}
                   >
-                    {Number(o.probability.toFixed(2))}%
+                    {Number(o.probability.toFixed(1))}%
                   </span>
                 </div>
               ))}

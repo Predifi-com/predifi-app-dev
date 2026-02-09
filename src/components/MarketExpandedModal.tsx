@@ -109,7 +109,7 @@ export function MarketExpandedModal({
                   <div key={o.label} className="flex items-center gap-1.5">
                     <div className={`w-2.5 h-2.5 rounded-full ${OUTCOME_DOT_COLORS[i % OUTCOME_DOT_COLORS.length]}`} />
                     <span className="text-sm font-semibold">
-                      {o.label} {Number(o.probability.toFixed(2))}%
+                      {o.label} {Number(o.probability.toFixed(1))}%
                     </span>
                   </div>
                 ))
@@ -188,7 +188,7 @@ export function MarketExpandedModal({
                           />
                         </div>
                         <span className="text-sm font-bold min-w-[3rem] text-right">
-                          {Number(o.probability.toFixed(2))}%
+                          {Number(o.probability.toFixed(1))}%
                         </span>
                         <Button
                           size="sm"

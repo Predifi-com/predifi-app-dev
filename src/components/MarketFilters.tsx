@@ -1,5 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Filter } from "lucide-react";
+import { Filter, ArrowUpDown } from "lucide-react";
 
 interface MarketFiltersProps {
   venue?: string;
@@ -10,7 +10,7 @@ interface MarketFiltersProps {
 
 export function MarketFilters({
   venue = 'all',
-  sortBy = 'createdAt_desc',
+  sortBy = 'trending',
   onVenueChange,
   onSortChange,
 }: MarketFiltersProps) {
@@ -33,14 +33,16 @@ export function MarketFilters({
 
       {/* Sort */}
       <Select value={sortBy} onValueChange={onSortChange}>
-        <SelectTrigger className="w-[160px] rounded-full border-2">
+        <SelectTrigger className="w-[170px] rounded-full border-2">
+          <ArrowUpDown className="w-4 h-4 mr-2" />
           <SelectValue placeholder="Sort by" />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="createdAt_desc">Newest First</SelectItem>
-          <SelectItem value="createdAt_asc">Oldest First</SelectItem>
-          <SelectItem value="volumeTotal_desc">Highest Volume</SelectItem>
-          <SelectItem value="volumeTotal_asc">Lowest Volume</SelectItem>
+          <SelectItem value="trending">Trending</SelectItem>
+          <SelectItem value="liquidity_desc">Top Liquidity</SelectItem>
+          <SelectItem value="volume24h_desc">Highest Volume</SelectItem>
+          <SelectItem value="createdAt_desc">Newest</SelectItem>
+          <SelectItem value="endingSoon">Ending Soon</SelectItem>
         </SelectContent>
       </Select>
     </div>

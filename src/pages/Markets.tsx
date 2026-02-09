@@ -2,7 +2,6 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import CategoryNav from "@/components/CategoryNav";
 import MarketFilters from "@/components/MarketFilters";
-import { MarketSearch } from "@/components/MarketSearch";
 import { SEO } from "@/components/SEO";
 
 import { useState, useEffect, useMemo } from "react";
@@ -18,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { useSearchParams } from "react-router-dom";
 import { Search, X } from "lucide-react";
 import { toast } from "sonner";
+import { extractGroupTitle, extractUniqueSegments } from "@/lib/market-label-utils";
 
 const Markets = () => {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -27,7 +27,7 @@ const Markets = () => {
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || "");
   const [category, setCategory] = useState<string>(searchParams.get('category') || "all");
   const [venue, setVenue] = useState<string>(searchParams.get('venue') || "all");
-  const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || "createdAt_desc");
+  const [sortBy, setSortBy] = useState<string>(searchParams.get('sort') || "trending");
   const [minVolume, setMinVolume] = useState<number | undefined>(
     searchParams.get('minVolume') ? Number(searchParams.get('minVolume')) : undefined
   );
@@ -43,114 +43,57 @@ const Markets = () => {
     }
   }, [error]);
 
+  // Sync category from URL (CategoryNav drives this)
+  useEffect(() => {
+    const urlCat = searchParams.get('category') || 'all';
+    const urlVenue = searchParams.get('venue') || 'all';
+    if (urlCat !== category) setCategory(urlCat);
+    if (urlVenue !== venue) setVenue(urlVenue);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
   // Sync filters to URL
   useEffect(() => {
     const params = new URLSearchParams();
     if (searchQuery) params.set('q', searchQuery);
     if (category && category !== 'all') params.set('category', category);
     if (venue && venue !== 'all') params.set('venue', venue);
-    if (sortBy !== 'createdAt_desc') params.set('sort', sortBy);
+    if (sortBy !== 'trending') params.set('sort', sortBy);
     if (minVolume) params.set('minVolume', minVolume.toString());
     setSearchParams(params, { replace: true });
   }, [searchQuery, category, venue, sortBy, minVolume, setSearchParams]);
 
-  // Parse sort string into field and direction
-  const [sortField, sortDir] = sortBy.split('_');
-
-  // Filter and transform markets
+  // Filter markets
   const filteredMarkets = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
-    return markets
-      .filter(market => {
-        // Filter by search query
-        if (query && !market.title.toLowerCase().includes(query)) return false;
-        
-        // Filter by status
-        if (!showClosed && market.status !== 'active') return false;
-        
-        // Filter by venue
-        if (venue && venue !== 'all') {
-          if (market.venue?.toLowerCase() !== venue.toLowerCase()) return false;
-        }
-        
-        return true;
-      });
-  }, [markets, searchQuery, showClosed, venue]);
-
-  /**
-   * Extract short, unique labels from grouped market titles.
-   * Strips common prefix, then trims trailing common phrases.
-   */
-  function extractUniqueSegments(titles: string[]): string[] {
-    if (titles.length <= 1) return titles;
-    
-    // Find common prefix (character by character)
-    const first = titles[0];
-    let prefixLen = 0;
-    for (let i = 0; i < first.length; i++) {
-      if (titles.every(t => t[i] === first[i])) prefixLen = i + 1;
-      else break;
-    }
-
-    // Strip prefix and clean
-    let segments = titles.map(t => {
-      let s = t.slice(prefixLen).trim();
-      s = s.replace(/^[,\s?]+/, '').trim();
-      return s;
+    return markets.filter(market => {
+      // Search query
+      if (query && !market.title.toLowerCase().includes(query)) return false;
+      // Status
+      if (!showClosed && market.status !== 'active') return false;
+      // Venue
+      if (venue && venue !== 'all') {
+        if (market.venue?.toLowerCase() !== venue.toLowerCase()) return false;
+      }
+      // Category
+      if (category && category !== 'all') {
+        const marketCat = (market.category || '').toLowerCase();
+        if (marketCat !== category.toLowerCase()) return false;
+      }
+      return true;
     });
-
-    // Find common suffix among ≥80% of segments (word-level, tolerates outliers)
-    const wordArrays = segments.map(s => s.split(/\s+/));
-    const threshold = Math.ceil(segments.length * 0.8);
-    const minLen = Math.min(...wordArrays.map(w => w.length));
-    let suffixWords = 0;
-    for (let i = 1; i <= minLen - 1; i++) {
-      const word = wordArrays[0][wordArrays[0].length - i];
-      const matches = wordArrays.filter(w => w[w.length - i] === word).length;
-      if (matches >= threshold) {
-        suffixWords = i;
-      } else break;
-    }
-
-    if (suffixWords > 0) {
-      segments = segments.map(s => {
-        const words = s.split(/\s+/);
-        // Only strip suffix if this segment actually ends with those words
-        const refWords = wordArrays[0];
-        const suffixMatch = Array.from({ length: suffixWords }, (_, i) => 
-          refWords[refWords.length - 1 - i]
-        ).reverse();
-        const segEnd = words.slice(-suffixWords);
-        if (segEnd.join(' ') === suffixMatch.join(' ')) {
-          return words.slice(0, words.length - suffixWords).join(' ');
-        }
-        return s;
-      });
-    }
-
-    // Final cleanup: strip trailing articles/prepositions and punctuation
-    return segments.map((s, i) => {
-      s = s.replace(/[,\s?!.]+$/, '').trim();
-      // Remove trailing partial connectors like "as the", "in the", "of the", "for the"
-      s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim();
-      s = s.replace(/\s+(as|in|of|for|to|at|on|by|from|with|the)\s*$/i, '').trim(); // second pass
-      return s || titles[i]; // fallback
-    });
-  }
+  }, [markets, searchQuery, showClosed, venue, category]);
 
   // Group markets by group_id and transform into displayable items
   const displayMarkets = useMemo(() => {
-    // Step 1: Separate grouped and ungrouped markets
     const groupMap = new Map<string, typeof filteredMarkets>();
     const standalone: typeof filteredMarkets = [];
 
     filteredMarkets.forEach(market => {
-      // Markets already pre-grouped by API (have outcomes array with 3+ items)
       if (market.outcomes && Array.isArray(market.outcomes) && market.outcomes.length > 2) {
-        standalone.push(market); // treat as self-contained multi-outcome
+        standalone.push(market);
         return;
       }
-      // Group by group_id (works for both Polymarket binary groups and Limitless categorical)
       if (market.group_id) {
         const existing = groupMap.get(market.group_id) || [];
         existing.push(market);
@@ -162,17 +105,19 @@ const Markets = () => {
 
     const items: Array<{ type: 'binary' | 'multi_outcome'; market: any }> = [];
 
-    // Step 2: Build grouped multi-outcome cards
+    // Build grouped multi-outcome cards
     groupMap.forEach((groupMarkets, groupId) => {
       if (groupMarkets.length <= 2) {
-        // 1-2 markets in a group — treat as individual binary cards
         groupMarkets.forEach(m => standalone.push(m));
         return;
       }
       const first = groupMarkets[0];
       const totalVol = groupMarkets.reduce((s, m) => s + (m.volume_total || m.volume_24h || 0), 0);
       
-      // Extract short outcome labels from titles
+      // Extract clean group title
+      const groupTitle = extractGroupTitle(groupMarkets.map(m => m.title));
+
+      // Extract short outcome labels
       const rawLabels = groupMarkets.map(m => (m as any).group_item_title || m.title);
       const shortLabels = extractUniqueSegments(rawLabels);
       const outcomes = groupMarkets.map((m, i) => ({
@@ -184,7 +129,7 @@ const Markets = () => {
         type: 'multi_outcome',
         market: {
           id: groupId,
-          title: first.title.split('?')[0] + '?' || first.title,
+          title: groupTitle,
           description: first.description || '',
           yesPercentage: 50,
           noPercentage: 50,
@@ -198,13 +143,14 @@ const Markets = () => {
           venue: first.venue || 'predifi',
           category: first.category || '',
           createdAt: first.created_at || '',
+          trendingScore: first.trending_score || 0,
           marketType: 'multi_outcome' as const,
           outcomes,
         },
       });
     });
 
-    // Step 3: Build standalone cards (binary + pre-grouped multi)
+    // Build standalone cards
     standalone.forEach(market => {
       const apiOutcomes = market.outcomes;
       const isMulti = apiOutcomes && Array.isArray(apiOutcomes) && apiOutcomes.length > 2;
@@ -230,6 +176,7 @@ const Markets = () => {
           venue: market.venue || 'predifi',
           category: market.category || '',
           createdAt: market.created_at || '',
+          trendingScore: market.trending_score || 0,
           marketType: isMulti ? 'multi_outcome' as const : 'binary' as const,
           outcomes: isMulti
             ? apiOutcomes.map((o: any) => ({ label: o.label || o.name, probability: Math.round((o.price ?? 0) * 100) }))
@@ -238,8 +185,35 @@ const Markets = () => {
       });
     });
 
+    // Sort items
+    items.sort((a, b) => {
+      const ma = a.market;
+      const mb = b.market;
+      switch (sortBy) {
+        case 'trending':
+          return (mb.trendingScore || 0) - (ma.trendingScore || 0);
+        case 'liquidity_desc':
+          return (mb.liquidity || 0) - (ma.liquidity || 0);
+        case 'volume24h_desc':
+          return (mb.volume24h || mb.totalVolume || 0) - (ma.volume24h || ma.totalVolume || 0);
+        case 'createdAt_desc':
+          return new Date(mb.createdAt || 0).getTime() - new Date(ma.createdAt || 0).getTime();
+        case 'endingSoon': {
+          const now = Date.now();
+          const endA = new Date(ma.endDate || '2099-01-01').getTime();
+          const endB = new Date(mb.endDate || '2099-01-01').getTime();
+          // Only future dates; push past dates to end
+          const aFuture = endA > now ? endA : Infinity;
+          const bFuture = endB > now ? endB : Infinity;
+          return aFuture - bFuture;
+        }
+        default:
+          return 0;
+      }
+    });
+
     return items;
-  }, [filteredMarkets]);
+  }, [filteredMarkets, sortBy]);
 
   // Refresh handler
   const handleRefresh = async () => {
@@ -325,41 +299,36 @@ const Markets = () => {
       
       {/* Main Content */}
       <div className="px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          {/* Markets Grid */}
-          <div className="lg:col-span-12">
-            <div className={`grid ${gridColsClass} gap-4`}>
-              {isLoading ? (
-                <>
-                  {[1, 2, 3, 4, 5, 6].map((n) => (
-                    <MarketCardSkeleton key={n} />
-                  ))}
-                </>
-              ) : displayMarkets.length === 0 ? (
-                <div className="col-span-full text-center py-12 text-muted-foreground">
-                  <p className="text-sm">No markets found.</p>
-                </div>
-              ) : (
-                displayMarkets.map((item) => (
-                  <MinimalMarketCard
-                    key={item.market.id}
-                    id={item.market.id}
-                    title={item.market.title}
-                    description={item.market.description}
-                    yesPercentage={item.market.yesPercentage}
-                    noPercentage={item.market.noPercentage}
-                    totalVolume={item.market.totalVolume}
-                    venue={item.market.venue}
-                    imageUrl={item.market.imageUrl}
-                    endDate={item.market.endDate}
-                    animationsEnabled={animationsEnabled}
-                    marketType={item.market.marketType}
-                    outcomes={item.market.outcomes}
-                  />
-                ))
-              )}
+        <div className={`grid ${gridColsClass} gap-4`}>
+          {isLoading ? (
+            <>
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <MarketCardSkeleton key={n} />
+              ))}
+            </>
+          ) : displayMarkets.length === 0 ? (
+            <div className="col-span-full text-center py-12 text-muted-foreground">
+              <p className="text-sm">No markets found.</p>
             </div>
-          </div>
+          ) : (
+            displayMarkets.map((item) => (
+              <MinimalMarketCard
+                key={item.market.id}
+                id={item.market.id}
+                title={item.market.title}
+                description={item.market.description}
+                yesPercentage={item.market.yesPercentage}
+                noPercentage={item.market.noPercentage}
+                totalVolume={item.market.totalVolume}
+                venue={item.market.venue}
+                imageUrl={item.market.imageUrl}
+                endDate={item.market.endDate}
+                animationsEnabled={animationsEnabled}
+                marketType={item.market.marketType}
+                outcomes={item.market.outcomes}
+              />
+            ))
+          )}
         </div>
       </div>
 
