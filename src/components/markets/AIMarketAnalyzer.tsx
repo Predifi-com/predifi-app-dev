@@ -1,9 +1,11 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Sparkles, Loader2, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+
+const AUTO_REFRESH_MS = 2 * 60 * 1000; // 2 minutes
 
 interface AIMarketAnalyzerProps {
   asset: string;
@@ -18,6 +20,7 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const fetchAnalysis = useCallback(async () => {
     if (isLoading) return;
@@ -42,6 +45,18 @@ export function AIMarketAnalyzer({ asset, timeframe, currentPrice, baseline, yes
       setIsLoading(false);
     }
   }, [asset, timeframe, currentPrice, baseline, yesProb, isLoading]);
+
+  // Auto-refresh every 2 minutes while expanded
+  useEffect(() => {
+    if (!collapsed && hasLoaded) {
+      intervalRef.current = setInterval(() => {
+        fetchAnalysis();
+      }, AUTO_REFRESH_MS);
+    }
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, [collapsed, hasLoaded, fetchAnalysis]);
 
   const handleToggle = () => {
     const next = !collapsed;
