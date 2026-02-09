@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { useParams } from "react-router-dom";
 import { Clock, AlertTriangle, Copy, TrendingUp, Loader2 } from "lucide-react";
 import { useArenaLeaderboard, type LeaderboardEntry } from "@/hooks/useArenaLeaderboard";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { useCountdown } from "@/hooks/useCountdown";
 
 // Mock positions for selected trader

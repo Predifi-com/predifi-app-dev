@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, Sparkles, Loader2, RefreshCw, Clock } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 import { toast } from "sonner";
 
 const AUTO_REFRESH_MS = 2 * 60 * 1000;

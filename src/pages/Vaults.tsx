@@ -23,7 +23,7 @@ import { useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { ethers } from "ethers";
 import { SigningDialog } from "@/components/SigningDialog";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/db";
 
 export default function Vaults() {
   const { vaultStats, commitments, userRewards, isLoading, isCommitting, createCommitment } = useVault();

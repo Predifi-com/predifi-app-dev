@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useWallet } from '@/hooks/useWallet';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/db';
 import { SUPPORTED_NETWORKS } from '@/config/gmx';
 import type {
   ConnectedWallet,
