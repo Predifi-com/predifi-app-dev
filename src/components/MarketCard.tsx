@@ -1,7 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { TrendingUp, Bell, Bot, Clock } from "lucide-react";
+import { Bell, Bot, Clock } from "lucide-react";
+import { getCategoryIcon } from "@/lib/category-icons";
 import { useState } from "react";
 import { TradingModal } from "./TradingModal";
 import { CreatePriceAlertModal } from "./CreatePriceAlertModal";
@@ -90,11 +91,14 @@ const MarketCard = ({
             <div className="w-12 h-12 rounded-md overflow-hidden flex-shrink-0 bg-muted">
               {displayImage ? (
                 <img src={displayImage} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-              )}
+              ) : (() => {
+                const Icon = getCategoryIcon(undefined, title);
+                return (
+                  <div className="w-full h-full flex items-center justify-center text-muted-foreground">
+                    <Icon className="w-5 h-5" />
+                  </div>
+                );
+              })()}
             </div>
             <Tooltip delayDuration={300}>
               <TooltipTrigger asChild>
