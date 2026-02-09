@@ -75,12 +75,26 @@ const Markets = () => {
     }
   }, [error]);
 
-  // Client-side search filter (on top of server-side category/venue)
+  // Client-side filters (on top of server-side category/venue)
   const searchFiltered = useMemo(() => {
+    let filtered = markets;
+
+    // Filter out ended markets unless showClosed is on
+    if (!showClosed) {
+      const now = Date.now();
+      filtered = filtered.filter(m => {
+        const end = m.expires_at || m.resolution_date;
+        if (!end) return true;
+        return new Date(end).getTime() > now;
+      });
+    }
+
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return markets;
-    return markets.filter(m => m.title.toLowerCase().includes(query));
-  }, [markets, searchQuery]);
+    if (query) {
+      filtered = filtered.filter(m => m.title.toLowerCase().includes(query));
+    }
+    return filtered;
+  }, [markets, searchQuery, showClosed]);
 
   // Group markets and build display items
   const displayMarkets = useMemo(() => {
