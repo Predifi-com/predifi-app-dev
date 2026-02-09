@@ -55,14 +55,14 @@ const MarketTrade = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
+    <div className="h-screen bg-background flex flex-col overflow-hidden">
       <SEO
         title={`${selected.asset} ${selected.timeframe} | Predifi`}
         description="Trade prediction markets."
       />
       <Header />
-      {/* 12-column grid: 3 / 6 / 3 */}
-      <div className="flex-1 grid grid-cols-12 h-[calc(100vh-3.5rem)] overflow-hidden">
+      {/* 12-column grid: 3 / 6 / 3 — fills remaining viewport */}
+      <div className="flex-1 min-h-0 grid grid-cols-12 overflow-hidden">
         {/* Left (3 cols): scrollable market list */}
         <div className="col-span-3 border-r border-border hidden md:flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center gap-2">
