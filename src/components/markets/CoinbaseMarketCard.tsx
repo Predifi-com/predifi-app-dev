@@ -132,14 +132,15 @@ export function CoinbaseMarketCard({ asset, timeframe, isSelected = false, compa
               />
               <ReferenceLine
                 y={baseline}
-                stroke="hsl(var(--muted-foreground))"
-                strokeDasharray="4 3"
-                strokeWidth={1}
+                stroke="hsl(var(--primary))"
+                strokeDasharray="6 3"
+                strokeWidth={1.5}
                 label={{
-                  value: `Baseline $${formatPrice(baseline)}`,
+                  value: `Rate to beat: $${formatPrice(baseline)}`,
                   position: "right",
-                  fill: "hsl(var(--muted-foreground))",
+                  fill: "hsl(var(--primary))",
                   fontSize: expanded ? 11 : 9,
+                  fontWeight: 600,
                 }}
               />
               <Area

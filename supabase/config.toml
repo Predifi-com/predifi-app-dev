@@ -1,25 +1,4 @@
-project_id = "ohvsrapyopgbsissbvpv"
+project_id = "utrzyvctjoshgkkvfvbj"
 
-[functions.limitless-proxy]
-verify_jwt = false
-
-[functions.check-price-alerts]
-verify_jwt = false
-
-[functions.verify-signature]
-verify_jwt = false
-
-[functions.monitor-balances]
-verify_jwt = false
-
-[functions.market-analysis]
-verify_jwt = false
-
-[functions.send-arena-notification]
-verify_jwt = false
-
-[functions.arena-unsubscribe]
-verify_jwt = false
-
-[functions.send-arena-bulk-notification]
+[functions.market-ai-analysis]
 verify_jwt = false
