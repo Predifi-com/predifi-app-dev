@@ -147,17 +147,16 @@ const Markets = () => {
     );
   }
 
-  // Default: curated grid — viewport-locked, scrollable card area
+  // Default: curated grid — hourly first, then daily
   return (
-    <div className="h-screen flex flex-col bg-background">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
       <SEO title="Markets | Predifi" description="Trade prediction markets on crypto majors with real-time data." />
       <Header />
 
-      <div className="flex-1 overflow-hidden">
-        <div className="h-full max-w-6xl mx-auto px-4 flex gap-8">
-          {/* Left: scrollable cards area */}
-          <div className="flex-1 min-w-0 flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between py-6 flex-shrink-0">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex gap-8">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center justify-between mb-8">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight">Markets</h1>
                 <p className="text-sm text-muted-foreground mt-1">Curated crypto prediction markets</p>
@@ -171,58 +170,59 @@ const Markets = () => {
               </Link>
             </div>
 
-            <ScrollArea className="flex-1">
-              <div className="space-y-3 pb-6">
-                {/* Hourly section */}
-                <div className="flex items-center gap-2 pt-2">
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Hourly</span>
-                  <div className="flex-1 border-t border-border/50" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {ASSETS.map((asset) => (
-                    <CoinbaseMarketCard
-                      key={`${asset}-hourly`}
-                      asset={asset}
-                      timeframe="hourly"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMarket({ asset, timeframe: "hourly" });
-                      }}
-                    />
-                  ))}
-                </div>
-
-                {/* Daily section */}
-                <div className="flex items-center gap-2 pt-4">
-                  <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Daily</span>
-                  <div className="flex-1 border-t border-border/50" />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  {ASSETS.map((asset) => (
-                    <CoinbaseMarketCard
-                      key={`${asset}-daily`}
-                      asset={asset}
-                      timeframe="daily"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedMarket({ asset, timeframe: "daily" });
-                      }}
-                    />
-                  ))}
-                </div>
+            <div className="space-y-3">
+              {/* Hourly section */}
+              <div className="flex items-center gap-2 pt-2">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Hourly</span>
+                <div className="flex-1 border-t border-border/50" />
               </div>
-            </ScrollArea>
+              <div className="grid grid-cols-2 gap-3">
+                {ASSETS.map((asset) => (
+                  <CoinbaseMarketCard
+                    key={`${asset}-hourly`}
+                    asset={asset}
+                    timeframe="hourly"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMarket({ asset, timeframe: "hourly" });
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Daily section */}
+              <div className="flex items-center gap-2 pt-4">
+                <span className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Daily</span>
+                <div className="flex-1 border-t border-border/50" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {ASSETS.map((asset) => (
+                  <CoinbaseMarketCard
+                    key={`${asset}-daily`}
+                    asset={asset}
+                    timeframe="daily"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedMarket({ asset, timeframe: "daily" });
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
           </div>
 
-          {/* Right: consensus — fixed */}
-          <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0 py-6">
-            <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
-              Consensus Probability
-            </h2>
-            <ConsensusWidget />
+          <div className="hidden lg:block w-72 xl:w-80 flex-shrink-0">
+            <div className="sticky top-20">
+              <h2 className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-4">
+                Consensus Probability
+              </h2>
+              <ConsensusWidget />
+            </div>
           </div>
         </div>
       </div>
+
+      <Footer />
     </div>
   );
 };
