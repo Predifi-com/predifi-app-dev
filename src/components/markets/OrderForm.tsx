@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,8 @@ import { useBalance } from "@/hooks/useBalance";
 import { useWallet } from "@/hooks/useWallet";
 import { toast } from "sonner";
 import { OrderConfirmModal } from "./OrderConfirmModal";
+import { StopLossTakeProfit } from "./StopLossTakeProfit";
+import { SessionTradeHistory, type TradeEntry } from "./SessionTradeHistory";
 
 const MIN_ORDER = 3;
 const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
@@ -33,6 +35,8 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const [slippage] = useState(0.5);
   const [showConfirm, setShowConfirm] = useState(false);
   const [fastOrder, setFastOrder] = useState(false);
+  const [slTp, setSlTp] = useState({ stopLoss: "", takeProfit: "" });
+  const [sessionTrades, setSessionTrades] = useState<TradeEntry[]>([]);
 
   const { balance } = useBalance();
   const { isConnected } = useWallet();
@@ -79,9 +83,25 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     onSideChange?.(s);
   };
 
-  const executeOrder = () => {
-    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}`);
-  };
+  const executeOrder = useCallback(() => {
+    const entry: TradeEntry = {
+      id: crypto.randomUUID(),
+      asset,
+      side,
+      orderType,
+      amount: numAmount,
+      leverage,
+      price: effectivePrice,
+      timestamp: Date.now(),
+      stopLoss: slTp.stopLoss || undefined,
+      takeProfit: slTp.takeProfit || undefined,
+    };
+    setSessionTrades((prev) => [entry, ...prev]);
+    const slTpLabel = leverage > 1 && (slTp.stopLoss || slTp.takeProfit)
+      ? ` · SL:${slTp.stopLoss || "—"} TP:${slTp.takeProfit || "—"}`
+      : "";
+    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
+  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp]);
 
   const handlePlaceOrder = () => {
     if (numAmount < MIN_ORDER) {
@@ -214,6 +234,17 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
         </div>
       )}
 
+      {/* SL/TP for leveraged positions */}
+      {isLeverage && leverage > 1 && (
+        <StopLossTakeProfit
+          entryPrice={effectivePrice}
+          leverage={leverage}
+          side={side}
+          liquidationPrice={liquidationPrice}
+          onValuesChange={setSlTp}
+        />
+      )}
+
       {/* Fixed-height slot for limit price */}
       <div className={cn("space-y-1", orderType !== "limit" && "hidden")}>
         <Label className="text-[10px] text-muted-foreground">Limit Price (¢)</Label>
@@ -298,6 +329,8 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
         liquidationPrice={liquidationPrice}
         asset={asset}
       />
+
+      <SessionTradeHistory trades={sessionTrades} />
     </div>
   );
 }
