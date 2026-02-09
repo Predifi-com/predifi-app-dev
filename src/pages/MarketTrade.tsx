@@ -6,6 +6,7 @@ import { CoinbaseMarketCard } from "@/components/markets/CoinbaseMarketCard";
 import { OrderForm } from "@/components/markets/OrderForm";
 import { OrderBookMini } from "@/components/markets/OrderBookMini";
 import { MarketRules } from "@/components/markets/MarketRules";
+import { AIMarketAnalyzer } from "@/components/markets/AIMarketAnalyzer";
 import { PositionManagement } from "@/components/markets/PositionManagement";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
@@ -28,12 +29,13 @@ function buildOrderedList() {
 
 const ORDERED_MARKETS = buildOrderedList();
 
-function useYesProb(asset: string, timeframe: "hourly" | "daily") {
+function useMarketData(asset: string, timeframe: "hourly" | "daily") {
   const data = useCoinbaseCandles(asset);
   const baseline = timeframe === "daily" ? data.dailyBaseline : data.hourlyBaseline;
-  if (baseline <= 0 || data.currentPrice <= 0) return 50;
-  const diff = ((data.currentPrice - baseline) / baseline) * 100;
-  return Math.min(95, Math.max(5, 50 + diff * 25));
+  const yesProb = (baseline <= 0 || data.currentPrice <= 0)
+    ? 50
+    : Math.min(95, Math.max(5, 50 + ((data.currentPrice - baseline) / baseline) * 100 * 25));
+  return { yesProb, baseline, currentPrice: data.currentPrice };
 }
 
 function parseSlug(slug: string): { asset: string; timeframe: "hourly" | "daily" } | null {
@@ -53,7 +55,7 @@ const MarketTrade = () => {
 
   const parsed = slug ? parseSlug(slug) : null;
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
-  const yesProb = useYesProb(selected.asset, selected.timeframe);
+  const { yesProb, baseline, currentPrice } = useMarketData(selected.asset, selected.timeframe);
 
   const handleSelect = (m: { asset: string; timeframe: "hourly" | "daily" }) => {
     navigate(`/markets/${m.asset}-${m.timeframe}`, { replace: true });
@@ -100,6 +102,15 @@ const MarketTrade = () => {
           <div className="flex-1 min-h-0 p-3">
             <CoinbaseMarketCard asset={selected.asset} timeframe={selected.timeframe} expanded />
           </div>
+
+          {/* Collapsible AI analyzer */}
+          <AIMarketAnalyzer
+            asset={selected.asset}
+            timeframe={selected.timeframe}
+            currentPrice={currentPrice}
+            baseline={baseline}
+            yesProb={yesProb}
+          />
 
           {/* Collapsible side-by-side order book */}
           <OrderBookMini yesProb={yesProb} side={activeSide} />
