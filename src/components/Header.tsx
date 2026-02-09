@@ -3,7 +3,7 @@ import { Menu, Settings, ChevronDown, X, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { WalletButton } from "@/components/WalletButton";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { SearchDialog } from "@/components/SearchDialog";
+
 import { NotificationsBell } from "@/components/NotificationsBell";
 import { UserAccountMenu } from "@/components/account/UserAccountMenu";
 import { ArenaEquityBadge } from "@/components/account/ArenaEquityBadge";
@@ -192,9 +192,6 @@ const Header = () => {
 
           {/* Right Section */}
           <div className="flex items-center gap-1">
-            {/* Search */}
-            <SearchDialog />
-
             {/* Notifications */}
             {isConnected && <NotificationsBell />}
 
