@@ -125,9 +125,18 @@ function startRestFallback() {
 function subscribe(asset: string) {
   const wasEmpty = store.subscribers.size === 0;
   store.subscribers.add(asset);
+
+  // Immediate REST seed so chart doesn't wait for WS or 5s fallback
+  if (!store.prices[asset]) {
+    const pair = PAIR_MAP[asset] || `${asset}-USD`;
+    fetch(`${COINBASE_REST}/products/${pair}/ticker`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.price) setPrice(asset, parseFloat(d.price)); })
+      .catch(() => {});
+  }
+
   if (wasEmpty) connectWs();
   else if (ws?.readyState === WebSocket.OPEN) {
-    // Add new subscription to existing WS
     const pair = PAIR_MAP[asset] || `${asset}-USD`;
     ws.send(JSON.stringify({ type: "subscribe", product_ids: [pair], channels: ["ticker"] }));
   }

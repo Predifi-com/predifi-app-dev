@@ -461,7 +461,11 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
 
       {/* Canvas */}
       <div ref={containerRef} className="flex-1 min-h-0 relative">
-        <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+        <canvas
+          key={resetKey}
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full animate-fade-in"
+        />
         {isLive && (
           <Tooltip>
             <TooltipTrigger asChild>
