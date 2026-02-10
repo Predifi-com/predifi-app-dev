@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useMemo } from "react";
-import { useCoinbaseCandles, formatPrice, CoinbaseCandle } from "@/hooks/useCoinbaseCandles";
+import { useMarketBaseline, fetchPeriodBaseline } from "@/hooks/useMarketBaseline";
+import { usePriceTicker, getTickerPrice } from "@/hooks/usePriceTicker";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
@@ -42,35 +43,30 @@ function fmtTime(ms: number) {
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-async function fetchRange(pair: string, gran: number, start: Date, end: Date): Promise<CoinbaseCandle[]> {
-  const url = `${COINBASE_API}/products/${pair}/candles?granularity=${gran}&start=${start.toISOString()}&end=${end.toISOString()}`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Coinbase ${res.status}`);
-  const raw: number[][] = await res.json();
-  return raw.map(([ts, low, high, open, close, volume]) => ({ timestamp: ts, open, high, low, close, volume })).reverse();
-}
-
 /* ═══════════════════════════════════════════════════════
    ResolutionChart — time-progressive countdown chart
+   
+   DATA MODEL:
+   - Baseline: from useMarketBaseline (candle fetch, once per period)
+   - Live price: from usePriceTicker (WebSocket, continuous)
+   - Chart points: built from ticker ticks, NOT from candles
    ═══════════════════════════════════════════════════════ */
 export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, periodState = "current" }: ResolutionChartProps) {
-  const data = useCoinbaseCandles(asset);
   const isDaily = timeframe === "daily";
   const pair = PAIR_MAP[asset] || `${asset}-USD`;
 
   const isLive = periodState === "current";
   const isFuture = periodState === "future";
 
-  /* ── Period boundaries ── */
-  const liveStart = useMemo(() => {
-    const d = new Date();
-    if (isDaily) d.setUTCHours(0, 0, 0, 0);
-    else d.setUTCMinutes(0, 0, 0);
-    return d.getTime();
-  }, [isDaily]);
+  /* ── Baseline from shared hook (fetches candles ONCE per period) ── */
+  const { baseline: liveBaseline, periodStart: livePeriodStart, periodEnd: livePeriodEnd, isLoading: baselineLoading } = useMarketBaseline(asset, timeframe);
 
-  const windowStart = periodStart ?? liveStart;
-  const windowEnd = periodEnd ?? (isDaily ? data.dailyCloseTime.getTime() : data.hourlyCloseTime.getTime());
+  /* ── Real-time price from WebSocket ticker ── */
+  const { price: tickerPrice } = usePriceTicker(asset);
+
+  /* ── Period boundaries ── */
+  const windowStart = periodStart ?? livePeriodStart;
+  const windowEnd = periodEnd ?? livePeriodEnd;
 
   /* ── Refs for animation-loop data (never cause re-renders) ── */
   const pointsRef = useRef<PricePoint[]>([]);
@@ -89,41 +85,37 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
   /* ── Countdown (for header display only) ── */
   const [countdown, setCountdown] = useState({ m: 0, s: 0 });
 
-  /* ═══ LIVE: sync baseline + candle data from hook into refs ═══ */
+  /* ═══ LIVE: sync baseline from hook into ref ═══ */
   useEffect(() => {
     if (!isLive) return;
-    const bl = isDaily ? data.dailyBaseline : data.hourlyBaseline;
-    if (bl > 0) baselineRef.current = bl;
-  }, [isLive, isDaily, data.hourlyBaseline, data.dailyBaseline]);
+    if (liveBaseline > 0) baselineRef.current = liveBaseline;
+  }, [isLive, liveBaseline]);
 
+  /* ═══ LIVE: sync ticker price into ref ═══ */
   useEffect(() => {
     if (!isLive) return;
-    const source = isDaily ? data.dailyCandles : data.candles;
-    if (source.length === 0) return;
-    // Rebuild points from candles (within current period)
-    const pts: PricePoint[] = source
-      .filter(c => c.timestamp * 1000 >= windowStart)
-      .map(c => ({ time: c.timestamp * 1000, price: c.close }));
-    pointsRef.current = pts;
-    if (data.currentPrice > 0) lastPriceRef.current = data.currentPrice;
-  }, [isLive, isDaily, data.candles, data.dailyCandles, data.currentPrice, windowStart]);
+    if (tickerPrice > 0) lastPriceRef.current = tickerPrice;
+  }, [isLive, tickerPrice]);
 
-  /* ═══ LIVE: 1-second ticker — injects a synthetic point every second ═══ */
+  /* ═══ LIVE: 1-second ticker — injects a point from real-time feed every second ═══ */
   useEffect(() => {
     if (!isLive) return;
     const tick = () => {
       const now = Date.now();
       const price = lastPriceRef.current;
       if (price <= 0) return;
-      // Append a new point at the current timestamp
+
       const pts = pointsRef.current;
-      // Remove any previous synthetic point (within last 1.5s) to avoid duplicates
+      // Append new tick point — deduplicate within 1.5s
       while (pts.length > 0 && pts[pts.length - 1].time > now - 1500) {
-        // If it's a candle-origin point (older than 2s from now), keep it
         if (now - pts[pts.length - 1].time > 2000) break;
         pts.pop();
       }
       pts.push({ time: now, price });
+
+      // Trim old points (keep max ~7200 for daily, ~3600 for hourly)
+      const maxPts = isDaily ? 7200 : 3600;
+      if (pts.length > maxPts) pts.splice(0, pts.length - maxPts);
 
       // Update countdown
       const diff = Math.max(0, windowEnd - now);
@@ -133,31 +125,37 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
     tick();
     tickerRef.current = setInterval(tick, 1000);
     return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
-  }, [isLive, windowEnd]);
+  }, [isLive, windowEnd, isDaily]);
 
-  /* ═══ PAST: fetch historical data ═══ */
+  /* ═══ PAST: fetch historical candles for past period view ═══ */
   useEffect(() => {
     if (isLive || isFuture) { setPastPoints([]); setPastBaseline(0); return; }
     let dead = false;
     setPastLoading(true);
     (async () => {
       try {
+        // Fetch baseline for this past period
+        const bl = await fetchPeriodBaseline(asset, timeframe, windowStart);
+        if (dead) return;
+        setPastBaseline(bl);
+
+        // Fetch chart candles for the past period
         const span = windowEnd - windowStart;
         const gran = span > 4 * 3600_000 ? 300 : 60;
-        // Baseline: last candle before this period
-        const blStart = new Date(windowStart - (gran === 300 ? 30 * 60_000 : 5 * 60_000));
-        const blCandles = await fetchRange(pair, gran, blStart, new Date(windowStart));
+        const url = `${COINBASE_API}/products/${pair}/candles?granularity=${gran}&start=${new Date(windowStart).toISOString()}&end=${new Date(windowEnd).toISOString()}`;
+        const res = await fetch(url);
+        if (!res.ok) throw new Error(`Coinbase ${res.status}`);
+        const raw: number[][] = await res.json();
         if (dead) return;
-        const bl = blCandles.length > 0 ? blCandles[blCandles.length - 1].close : 0;
-        setPastBaseline(bl);
-        const chart = await fetchRange(pair, gran, new Date(windowStart), new Date(windowEnd));
-        if (dead) return;
-        setPastPoints(chart.map(c => ({ time: c.timestamp * 1000, price: c.close })));
+        const pts = raw
+          .map(([ts, , , , close]) => ({ time: ts * 1000, price: close }))
+          .reverse();
+        setPastPoints(pts);
       } catch (e) { console.error("Past period load error:", e); }
       finally { if (!dead) setPastLoading(false); }
     })();
     return () => { dead = true; };
-  }, [isLive, isFuture, windowStart, windowEnd, pair]);
+  }, [isLive, isFuture, windowStart, windowEnd, pair, asset, timeframe]);
 
   /* ═══ RENDER LOOP ═══ */
   useEffect(() => {
@@ -190,7 +188,7 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
         tMax = NOW;
         pts = pointsRef.current.filter(p => p.time >= windowStart && p.time <= NOW);
 
-        // Inject "now" point at exact current time so line always reaches right edge
+        // Inject "now" point so line always reaches right edge
         const price = lastPriceRef.current;
         if (price > 0 && pts.length > 0) {
           const last = pts[pts.length - 1];
@@ -312,21 +310,14 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
     return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
   }, [isLive, isFuture, windowStart, windowEnd, pastPoints, pastBaseline]);
 
-  /* Draw once for past data */
-  useEffect(() => {
-    if (!isLive && pastPoints.length > 0) {
-      // Trigger a single render by toggling a ref — the main effect handles it
-    }
-  }, [pastPoints, isLive]);
-
   /* ── Derived values for header ── */
-  const baseline = isLive ? (isDaily ? data.dailyBaseline : data.hourlyBaseline) : pastBaseline;
-  const currentPrice = isLive ? data.currentPrice : (pastPoints.length > 0 ? pastPoints[pastPoints.length - 1].price : 0);
+  const baseline = isLive ? liveBaseline : pastBaseline;
+  const currentPrice = isLive ? tickerPrice : (pastPoints.length > 0 ? pastPoints[pastPoints.length - 1].price : 0);
   const isAbove = currentPrice >= baseline && baseline > 0;
   const priceDiff = baseline > 0 ? currentPrice - baseline : 0;
 
   /* ── Loading / Future guards ── */
-  if ((isLive && data.isLoading) || (!isLive && !isFuture && pastLoading)) {
+  if ((isLive && baselineLoading && tickerPrice === 0) || (!isLive && !isFuture && pastLoading)) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -353,19 +344,19 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-4 pb-2">
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price to beat</span>
-          <div className="text-xl font-bold tabular-nums text-foreground">${formatPrice(baseline)}</div>
+          <div className="text-xl font-bold tabular-nums text-foreground">{fmtPrice(baseline)}</div>
         </div>
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             {isLive ? "Current Price" : "Final Price"}{" "}
             {baseline > 0 && (
               <span className={cn("ml-1", isAbove ? "text-emerald-500" : "text-red-500")}>
-                {isAbove ? "▲" : "▼"} ${formatPrice(Math.abs(priceDiff))}
+                {isAbove ? "▲" : "▼"} {fmtPrice(Math.abs(priceDiff))}
               </span>
             )}
           </span>
           <div className={cn("text-xl font-bold tabular-nums", isAbove ? "text-emerald-500" : "text-red-500")}>
-            ${formatPrice(currentPrice)}
+            {fmtPrice(currentPrice)}
           </div>
         </div>
         {isLive && (
