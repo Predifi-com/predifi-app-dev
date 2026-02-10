@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from "react";
 import { useMarketBaseline, fetchPeriodBaseline } from "@/hooks/useMarketBaseline";
 import { usePriceTicker, getTickerPrice } from "@/hooks/usePriceTicker";
 import { cn } from "@/lib/utils";
-import { Loader2 } from "lucide-react";
+import { Loader2, RefreshCw } from "lucide-react";
 
 /* ── Types ── */
 interface ResolutionChartProps {
@@ -87,6 +87,13 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
 
   /* ── Countdown (for header display only) ── */
   const [countdown, setCountdown] = useState({ m: 0, s: 0 });
+  const [resetKey, setResetKey] = useState(0);
+
+  const handleRefreshChart = () => {
+    pointsRef.current = [];
+    lastPriceRef.current = 0;
+    setResetKey(k => k + 1);
+  };
 
   /* ═══ LIVE: sync baseline from hook into ref ═══ */
   useEffect(() => {
@@ -124,7 +131,7 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
     tick();
     tickerRef.current = setInterval(tick, 1000);
     return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
-  }, [isLive, windowEnd]);
+  }, [isLive, windowEnd, resetKey]);
 
   /* ═══ PAST: fetch historical candles for past period view ═══ */
   useEffect(() => {
@@ -451,6 +458,15 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       {/* Canvas */}
       <div ref={containerRef} className="flex-1 min-h-0 relative">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
+        {isLive && (
+          <button
+            onClick={handleRefreshChart}
+            title="Refresh chart"
+            className="absolute top-2 right-2 p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+          </button>
+        )}
       </div>
     </div>
   );
