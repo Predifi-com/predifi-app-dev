@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { SEO } from "@/components/SEO";
 import { CoinbaseMarketCard } from "@/components/markets/CoinbaseMarketCard";
+import { ResolutionChart } from "@/components/markets/ResolutionChart";
 import { OrderForm } from "@/components/markets/OrderForm";
 import { OrderBookMini } from "@/components/markets/OrderBookMini";
 import { MarketRules } from "@/components/markets/MarketRules";
@@ -104,9 +105,9 @@ const MarketTrade = () => {
 
         {/* ── Center (6 cols): chart → orderbook → positions ── */}
         <div className="col-span-12 md:col-span-6 flex flex-col overflow-hidden">
-          {/* Chart */}
-          <div className="flex-1 min-h-0 p-3">
-            <CoinbaseMarketCard asset={selected.asset} timeframe={selected.timeframe} expanded />
+          {/* Resolution Chart */}
+          <div className="flex-1 min-h-0">
+            <ResolutionChart asset={selected.asset} timeframe={selected.timeframe} />
           </div>
 
           {/* Collapsible AI analyzer */}
