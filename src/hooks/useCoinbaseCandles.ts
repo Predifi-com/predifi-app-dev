@@ -161,18 +161,67 @@ export function useCoinbaseCandles(asset: string) {
 
     const load = async () => {
       try {
-        // Fetch 1-min candles from start of current hour (hourly chart)
+        // ── Hourly baseline: fetch the last candle of the previous hour ──
         const currentHourStart = new Date();
         currentHourStart.setUTCMinutes(0, 0, 0);
+        const prevHourStart = new Date(currentHourStart.getTime() - 60 * 60 * 1000);
+
+        let hourlyBaseline = 0;
+        try {
+          // Fetch 1-min candles covering the last 5 minutes of the previous hour
+          const prevHourEnd = new Date(currentHourStart.getTime() - 1000); // HH:59:59
+          const prevHourLate = new Date(currentHourStart.getTime() - 5 * 60 * 1000); // HH:55:00
+          const baselineCandles = await fetchCandlesSince(pair, 60, prevHourLate);
+          if (!cancelled && baselineCandles.length > 0) {
+            // Get the last candle that falls within the previous hour
+            const prevHourCandles = baselineCandles.filter(c => c.timestamp * 1000 < currentHourStart.getTime());
+            hourlyBaseline = prevHourCandles.length > 0
+              ? prevHourCandles[prevHourCandles.length - 1].close
+              : baselineCandles[0].close;
+          }
+        } catch {
+          // fallback below
+        }
+
+        // Fetch 1-min candles from start of current hour (hourly chart)
         const candles = await fetchCandlesSince(pair, 60, currentHourStart);
         if (cancelled) return;
 
         const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : 0;
-        const hourlyBaseline = computeBaseline(candles, "hourly");
 
-        // Fetch 5-min candles from 00:00 UTC today (daily chart)
+        // If baseline fetch failed, use first candle's open as fallback
+        if (hourlyBaseline === 0 && candles.length > 0) {
+          hourlyBaseline = candles[0].open;
+        }
+
+        // ── Daily baseline: fetch previous day's closing price ──
         const todayMidnight = new Date();
         todayMidnight.setUTCHours(0, 0, 0, 0);
+
+        let dailyBaseline = currentPrice;
+        try {
+          // Fetch the last few 5-min candles from yesterday evening
+          const yesterdayLate = new Date(todayMidnight.getTime() - 30 * 60 * 1000); // 23:30 UTC yesterday
+          const yesterdayCandles = await fetchCandlesSince(pair, 300, yesterdayLate);
+          if (!cancelled && yesterdayCandles.length > 0) {
+            const prevDayCandles = yesterdayCandles.filter(c => c.timestamp * 1000 < todayMidnight.getTime());
+            dailyBaseline = prevDayCandles.length > 0
+              ? prevDayCandles[prevDayCandles.length - 1].close
+              : yesterdayCandles[0].close;
+          }
+        } catch {
+          // fallback: use daily candle API
+          try {
+            const dailyBaseCandles = await fetchCandles(pair, 86400, 2);
+            if (!cancelled && dailyBaseCandles.length >= 2) {
+              dailyBaseline = dailyBaseCandles[dailyBaseCandles.length - 2].close;
+            }
+          } catch {
+            dailyBaseline = candles[0]?.open ?? currentPrice;
+          }
+        }
+
+        // Fetch 5-min candles from 00:00 UTC today (daily chart)
         let dailyChartCandles: CoinbaseCandle[] = [];
         try {
           dailyChartCandles = await fetchCandlesSince(pair, 300, todayMidnight);
@@ -180,19 +229,6 @@ export function useCoinbaseCandles(asset: string) {
           // fallback: empty
         }
         if (cancelled) return;
-
-        // For daily baseline, fetch one daily candle
-        let dailyBaseline = currentPrice;
-        try {
-          const dailyBaseCandles = await fetchCandles(pair, 86400, 2);
-          if (!cancelled && dailyBaseCandles.length >= 2) {
-            dailyBaseline = dailyBaseCandles[dailyBaseCandles.length - 2].close;
-          } else if (!cancelled && dailyBaseCandles.length === 1) {
-            dailyBaseline = dailyBaseCandles[0].open;
-          }
-        } catch {
-          dailyBaseline = candles[0]?.open ?? currentPrice;
-        }
 
         setData({
           asset,
