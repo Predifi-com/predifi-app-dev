@@ -3,6 +3,7 @@ import { useMarketBaseline, fetchPeriodBaseline } from "@/hooks/useMarketBaselin
 import { usePriceTicker, getTickerPrice } from "@/hooks/usePriceTicker";
 import { cn } from "@/lib/utils";
 import { Loader2, RefreshCw } from "lucide-react";
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 
 /* ── Types ── */
 interface ResolutionChartProps {
@@ -88,11 +89,14 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
   /* ── Countdown (for header display only) ── */
   const [countdown, setCountdown] = useState({ m: 0, s: 0 });
   const [resetKey, setResetKey] = useState(0);
+  const [spinning, setSpinning] = useState(false);
 
   const handleRefreshChart = () => {
     pointsRef.current = [];
     lastPriceRef.current = 0;
     setResetKey(k => k + 1);
+    setSpinning(true);
+    setTimeout(() => setSpinning(false), 600);
   };
 
   /* ═══ LIVE: sync baseline from hook into ref ═══ */
@@ -459,13 +463,17 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       <div ref={containerRef} className="flex-1 min-h-0 relative">
         <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
         {isLive && (
-          <button
-            onClick={handleRefreshChart}
-            title="Refresh chart"
-            className="absolute top-2 right-2 p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <RefreshCw className="w-3.5 h-3.5" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={handleRefreshChart}
+                className="absolute top-2 right-2 p-1.5 rounded-md bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <RefreshCw className={cn("w-3.5 h-3.5 transition-transform duration-500", spinning && "animate-spin")} />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="left" className="text-xs">Refresh chart</TooltipContent>
+          </Tooltip>
         )}
       </div>
     </div>
