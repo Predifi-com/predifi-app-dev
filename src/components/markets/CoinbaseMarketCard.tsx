@@ -137,7 +137,7 @@ export function CoinbaseMarketCard({ asset, timeframe, isSelected = false, compa
                 strokeDasharray="6 3"
                 strokeWidth={1.5}
                 label={{
-                  value: `Rate to beat: $${formatPrice(baseline)}`,
+                  value: `$${formatPrice(baseline)}`,
                   position: "right",
                   fill: "hsl(var(--primary))",
                   fontSize: expanded ? 11 : 9,
