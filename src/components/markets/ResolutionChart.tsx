@@ -1,16 +1,6 @@
-import { useMemo, useState, useEffect, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useCoinbaseCandles, formatPrice } from "@/hooks/useCoinbaseCandles";
 import { cn } from "@/lib/utils";
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  ReferenceLine,
-  Tooltip,
-  CartesianGrid,
-} from "recharts";
 import { Loader2 } from "lucide-react";
 
 interface ResolutionChartProps {
@@ -18,6 +8,35 @@ interface ResolutionChartProps {
   timeframe: "hourly" | "daily";
 }
 
+/** A single price point in the timeline */
+interface PricePoint {
+  time: number; // ms timestamp
+  price: number;
+}
+
+// ─── Canvas Chart Constants ───
+const PADDING = { top: 30, right: 80, bottom: 30, left: 12 };
+const BASELINE_COLOR = "#6366f1"; // primary-ish
+const GREEN = "#22c55e";
+const RED = "#ef4444";
+const GRID_COLOR = "rgba(148,163,184,0.15)";
+const TEXT_COLOR = "rgba(148,163,184,0.8)";
+
+function formatChartPrice(price: number): string {
+  if (price >= 1000) return "$" + price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (price >= 1) return "$" + price.toFixed(4);
+  return "$" + price.toFixed(6);
+}
+
+function formatTimeLabel(ms: number): string {
+  const d = new Date(ms);
+  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+/**
+ * Pure canvas resolution chart.
+ * Time is controlled manually — no charting library involved.
+ */
 export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
   const data = useCoinbaseCandles(asset);
   const isDaily = timeframe === "daily";
@@ -25,74 +44,265 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
   const baseline = isDaily ? data.dailyBaseline : data.hourlyBaseline;
   const closeTime = isDaily ? data.dailyCloseTime : data.hourlyCloseTime;
 
-  // Window start is fixed for the period
-  const windowStart = useMemo(() => {
+  // ── Compute fixed window start (once per period) ──
+  const windowStartRef = useRef(0);
+  if (windowStartRef.current === 0) {
     const now = new Date();
     if (isDaily) {
       const d = new Date(now);
       d.setUTCHours(0, 0, 0, 0);
-      return d.getTime();
+      windowStartRef.current = d.getTime();
+    } else {
+      const d = new Date(now);
+      d.setUTCMinutes(0, 0, 0);
+      windowStartRef.current = d.getTime();
     }
-    const d = new Date(now);
-    d.setUTCMinutes(0, 0, 0);
-    return d.getTime();
-  }, [isDaily]);
-
+  }
+  const windowStart = windowStartRef.current;
   const windowEnd = closeTime.getTime();
 
-  // Tick every second — drives chart forward
-  const [now, setNow] = useState(Date.now());
+  // ── Build point buffer from candle data ──
+  const pointsRef = useRef<PricePoint[]>([]);
+  const lastKnownPriceRef = useRef(0);
+
+  // Seed points from candle data whenever it updates
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  // Countdown
-  const countdown = useMemo(() => {
-    const diff = Math.max(0, windowEnd - now);
-    const totalSecs = Math.floor(diff / 1000);
-    return { mins: Math.floor(totalSecs / 60), secs: totalSecs % 60 };
-  }, [windowEnd, now]);
-
-  // Build time-progressive data: x-axis ends at NOW, not at windowEnd
-  const chartData = useMemo(() => {
     const source = isDaily ? data.dailyCandles : data.candles;
-    const points = source
-      .filter((c) => c.timestamp * 1000 >= windowStart && c.timestamp * 1000 <= now)
+    if (source.length === 0) return;
+
+    const newPoints: PricePoint[] = source
+      .filter((c) => c.timestamp * 1000 >= windowStart)
       .map((c) => ({ time: c.timestamp * 1000, price: c.close }));
 
-    // Always extend to current time with latest price (line marches forward even if flat)
+    // Merge: keep existing fine-grained points that are newer than last candle
+    const lastCandleTime = newPoints.length > 0 ? newPoints[newPoints.length - 1].time : 0;
+    const existingFine = pointsRef.current.filter((p) => p.time > lastCandleTime);
+
+    pointsRef.current = [...newPoints, ...existingFine];
+    lastKnownPriceRef.current = data.currentPrice;
+  }, [data.candles, data.dailyCandles, data.currentPrice, isDaily, windowStart]);
+
+  // ── Track current price ──
+  useEffect(() => {
     if (data.currentPrice > 0) {
-      const lastTime = points.length > 0 ? points[points.length - 1].time : 0;
-      if (now > lastTime) {
-        points.push({ time: now, price: data.currentPrice });
+      lastKnownPriceRef.current = data.currentPrice;
+    }
+  }, [data.currentPrice]);
+
+  // ── Canvas ref + resize ──
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animFrameRef = useRef<number>(0);
+
+  // ── Countdown state ──
+  const [countdown, setCountdown] = useState({ mins: 0, secs: 0 });
+  const [nowTs, setNowTs] = useState(Date.now());
+
+  // ── Main render loop (runs every frame via rAF) ──
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const container = containerRef.current;
+    if (!canvas || !container) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    const w = container.clientWidth;
+    const h = container.clientHeight;
+
+    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      canvas.style.width = w + "px";
+      canvas.style.height = h + "px";
+    }
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, w, h);
+
+    const now = Date.now();
+
+    // Inject a point at NOW with last known price (ensures line progresses even if flat)
+    const price = lastKnownPriceRef.current;
+    if (price > 0) {
+      const pts = pointsRef.current;
+      if (pts.length === 0 || pts[pts.length - 1].time < now - 500) {
+        pts.push({ time: now, price });
+      } else {
+        // Update last point to current time + price
+        pts[pts.length - 1] = { time: now, price };
       }
     }
 
-    return points;
-  }, [data.candles, data.dailyCandles, data.currentPrice, isDaily, windowStart, now]);
+    const points = pointsRef.current.filter((p) => p.time >= windowStart && p.time <= now);
+    if (points.length < 1 || baseline <= 0) {
+      // Nothing to draw yet
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.font = "12px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText("Waiting for price data…", w / 2, h / 2);
+      animFrameRef.current = requestAnimationFrame(draw);
+      return;
+    }
+
+    // ── Coordinate mapping ──
+    const chartW = w - PADDING.left - PADDING.right;
+    const chartH = h - PADDING.top - PADDING.bottom;
+
+    const tMin = windowStart;
+    const tMax = now; // x-axis ends at NOW — no future
+    const tRange = Math.max(tMax - tMin, 1000);
+
+    // Y range: encompass all prices + baseline with padding
+    const allPrices = points.map((p) => p.price);
+    allPrices.push(baseline);
+    let yMin = Math.min(...allPrices);
+    let yMax = Math.max(...allPrices);
+    const yPad = (yMax - yMin) * 0.15 || yMax * 0.002;
+    yMin -= yPad;
+    yMax += yPad;
+    const yRange = yMax - yMin || 1;
+
+    const toX = (t: number) => PADDING.left + ((t - tMin) / tRange) * chartW;
+    const toY = (p: number) => PADDING.top + (1 - (p - yMin) / yRange) * chartH;
+
+    // ── Grid lines (horizontal) ──
+    ctx.strokeStyle = GRID_COLOR;
+    ctx.lineWidth = 1;
+    const yTicks = 5;
+    for (let i = 0; i <= yTicks; i++) {
+      const yVal = yMin + (i / yTicks) * yRange;
+      const y = toY(yVal);
+      ctx.beginPath();
+      ctx.moveTo(PADDING.left, y);
+      ctx.lineTo(w - PADDING.right, y);
+      ctx.stroke();
+
+      // Y labels
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.textAlign = "left";
+      ctx.fillText(formatChartPrice(yVal), w - PADDING.right + 4, y + 3);
+    }
+
+    // ── Time labels (x-axis) ──
+    const xTicks = Math.min(8, Math.floor(chartW / 80));
+    for (let i = 0; i <= xTicks; i++) {
+      const t = tMin + (i / xTicks) * tRange;
+      const x = toX(t);
+      ctx.fillStyle = TEXT_COLOR;
+      ctx.font = "10px system-ui, sans-serif";
+      ctx.textAlign = "center";
+      ctx.fillText(formatTimeLabel(t), x, h - 8);
+    }
+
+    // ── Baseline ──
+    const baselineY = toY(baseline);
+    ctx.setLineDash([8, 4]);
+    ctx.strokeStyle = BASELINE_COLOR;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(PADDING.left, baselineY);
+    ctx.lineTo(w - PADDING.right, baselineY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Baseline label
+    ctx.fillStyle = BASELINE_COLOR;
+    ctx.font = "bold 10px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(`Price to beat  ${formatChartPrice(baseline)}`, w - PADDING.right + 4, baselineY - 6);
+
+    // ── Price line ──
+    const isAbove = price >= baseline;
+    const color = isAbove ? GREEN : RED;
+
+    // Gradient fill
+    const gradient = ctx.createLinearGradient(0, PADDING.top, 0, h - PADDING.bottom);
+    gradient.addColorStop(0, isAbove ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)");
+    gradient.addColorStop(1, "rgba(0,0,0,0)");
+
+    // Draw filled area
+    ctx.beginPath();
+    ctx.moveTo(toX(points[0].time), toY(points[0].price));
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(toX(points[i].time), toY(points[i].price));
+    }
+    // Close to bottom
+    ctx.lineTo(toX(points[points.length - 1].time), h - PADDING.bottom);
+    ctx.lineTo(toX(points[0].time), h - PADDING.bottom);
+    ctx.closePath();
+    ctx.fillStyle = gradient;
+    ctx.fill();
+
+    // Draw line
+    ctx.beginPath();
+    ctx.moveTo(toX(points[0].time), toY(points[0].price));
+    for (let i = 1; i < points.length; i++) {
+      ctx.lineTo(toX(points[i].time), toY(points[i].price));
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // ── Live dot (latest point) ──
+    const lastPt = points[points.length - 1];
+    const lx = toX(lastPt.time);
+    const ly = toY(lastPt.price);
+
+    // Pulse ring
+    const pulse = (Math.sin(now / 400) + 1) / 2; // 0-1 oscillation
+    ctx.beginPath();
+    ctx.arc(lx, ly, 6 + pulse * 6, 0, Math.PI * 2);
+    ctx.fillStyle = isAbove ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)";
+    ctx.fill();
+
+    // Solid dot
+    ctx.beginPath();
+    ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // Current price label next to dot
+    ctx.fillStyle = color;
+    ctx.font = "bold 11px system-ui, sans-serif";
+    ctx.textAlign = "left";
+    ctx.fillText(formatChartPrice(lastPt.price), lx + 10, ly + 4);
+
+    // ── Schedule next frame ──
+    animFrameRef.current = requestAnimationFrame(draw);
+  }, [baseline, windowStart]);
+
+  // Start/stop render loop
+  useEffect(() => {
+    animFrameRef.current = requestAnimationFrame(draw);
+    return () => {
+      if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
+    };
+  }, [draw]);
+
+  // Countdown ticker (1s)
+  useEffect(() => {
+    const tick = () => {
+      const n = Date.now();
+      setNowTs(n);
+      const diff = Math.max(0, windowEnd - n);
+      const totalSecs = Math.floor(diff / 1000);
+      setCountdown({ mins: Math.floor(totalSecs / 60), secs: totalSecs % 60 });
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [windowEnd]);
 
   const currentPrice = data.currentPrice;
   const isAbove = currentPrice >= baseline && baseline > 0;
   const priceDiff = baseline > 0 ? currentPrice - baseline : 0;
-  const lineColor = isAbove ? "hsl(152, 69%, 53%)" : "hsl(0, 84%, 60%)";
-  const gradientId = `res-grad-${asset}-${timeframe}`;
-
-  // Y-axis: encompass baseline and all prices
-  const yDomain = useMemo(() => {
-    if (chartData.length === 0 && baseline <= 0) return [0, 100];
-    const prices = chartData.map((d) => d.price);
-    if (baseline > 0) prices.push(baseline);
-    const min = Math.min(...prices);
-    const max = Math.max(...prices);
-    const pad = (max - min) * 0.15 || max * 0.002;
-    return [min - pad, max + pad];
-  }, [chartData, baseline]);
-
-  const formatTime = useCallback(
-    (ts: number) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }),
-    []
-  );
 
   if (data.isLoading) {
     return (
@@ -112,7 +322,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Header ── */}
+      {/* ── Header: Price to beat | Current price | Countdown ── */}
       <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-4 pb-2">
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -172,86 +382,12 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
         </div>
       </div>
 
-      {/* ── Time-progressive chart: x-axis grows to NOW ── */}
-      <div className="flex-1 min-h-0 px-1 pb-2">
-        {chartData.length < 2 ? (
-          <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
-            Waiting for price data…
-          </div>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={chartData} margin={{ top: 8, right: 55, left: 10, bottom: 4 }}>
-              <defs>
-                <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={lineColor} stopOpacity={0.2} />
-                  <stop offset="95%" stopColor={lineColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
-
-              {/* X-axis: windowStart → now (NOT windowEnd) */}
-              <XAxis
-                dataKey="time"
-                type="number"
-                domain={[windowStart, now]}
-                tickFormatter={formatTime}
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-                tickLine={false}
-                axisLine={{ stroke: "hsl(var(--border))" }}
-                minTickGap={50}
-              />
-              <YAxis
-                domain={yDomain}
-                tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
-                tickLine={false}
-                axisLine={false}
-                tickFormatter={(v: number) => `$${formatPrice(v)}`}
-                width={70}
-              />
-
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "8px",
-                  fontSize: "11px",
-                  padding: "6px 10px",
-                }}
-                labelFormatter={(ts: number) => new Date(ts).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })}
-                formatter={(value: number) => [`$${formatPrice(value)}`, "Price"]}
-              />
-
-              {/* Baseline */}
-              {baseline > 0 && (
-                <ReferenceLine
-                  y={baseline}
-                  stroke="hsl(var(--primary))"
-                  strokeDasharray="8 4"
-                  strokeWidth={2}
-                  label={{
-                    value: `Price to beat  $${formatPrice(baseline)}`,
-                    position: "right",
-                    fill: "hsl(var(--primary))",
-                    fontSize: 10,
-                    fontWeight: 700,
-                  }}
-                />
-              )}
-
-              {/* Live price line */}
-              <Area
-                type="monotone"
-                dataKey="price"
-                stroke={lineColor}
-                fill={`url(#${gradientId})`}
-                strokeWidth={2}
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 0, fill: lineColor }}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        )}
+      {/* ── Canvas chart ── */}
+      <div ref={containerRef} className="flex-1 min-h-0 relative">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full"
+        />
       </div>
     </div>
   );
