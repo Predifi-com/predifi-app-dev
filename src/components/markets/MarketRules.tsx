@@ -6,7 +6,7 @@ interface MarketRulesProps {
 }
 
 export function MarketRules({ asset, timeframe }: MarketRulesProps) {
-  const tvUrl = `https://in.tradingview.com/symbols/${asset}USD/?exchange=COINBASE`;
+  const tvUrl = `https://www.tradingview.com/chart/?symbol=COINBASE%3A${asset}USD`;
 
   return (
     <div className="p-3 space-y-3">
