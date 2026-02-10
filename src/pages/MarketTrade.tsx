@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import { SEO } from "@/components/SEO";
 import { CoinbaseMarketCard } from "@/components/markets/CoinbaseMarketCard";
 import { ResolutionChart } from "@/components/markets/ResolutionChart";
+import { PeriodTimeline, type PeriodSlot } from "@/components/markets/PeriodTimeline";
 import { OrderForm } from "@/components/markets/OrderForm";
 import { OrderBookMini } from "@/components/markets/OrderBookMini";
 import { MarketRules } from "@/components/markets/MarketRules";
@@ -49,6 +50,17 @@ function parseSlug(slug: string): { asset: string; timeframe: "hourly" | "daily"
   return { asset: upperAsset, timeframe: tf };
 }
 
+/** Get current period start for the given timeframe */
+function getCurrentPeriodStart(timeframe: "hourly" | "daily"): number {
+  const now = new Date();
+  if (timeframe === "daily") {
+    now.setUTCHours(0, 0, 0, 0);
+  } else {
+    now.setUTCMinutes(0, 0, 0);
+  }
+  return now.getTime();
+}
+
 const MarketTrade = () => {
   const { slug } = useParams<{ slug: string }>();
   const navigate = useNavigate();
@@ -59,6 +71,24 @@ const MarketTrade = () => {
   const parsed = slug ? parseSlug(slug) : null;
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
   const { yesProb, baseline, currentPrice } = useMarketData(selected.asset, selected.timeframe);
+
+  // Timeline state — scoped to selected card's timeframe
+  const currentPeriodStart = useMemo(
+    () => getCurrentPeriodStart(selected.timeframe),
+    [selected.timeframe]
+  );
+  const [selectedSlot, setSelectedSlot] = useState<PeriodSlot | null>(null);
+
+  // Reset timeline selection when switching markets
+  const marketKey = `${selected.asset}-${selected.timeframe}`;
+  const [lastMarketKey, setLastMarketKey] = useState(marketKey);
+  if (marketKey !== lastMarketKey) {
+    setLastMarketKey(marketKey);
+    setSelectedSlot(null);
+  }
+
+  const activeSlotStart = selectedSlot?.start ?? currentPeriodStart;
+  const activeSlotState = selectedSlot?.state ?? "current";
 
   const handleSelect = (m: { asset: string; timeframe: "hourly" | "daily" }) => {
     navigate(`/markets/${m.asset}-${m.timeframe}`, { replace: true });
@@ -76,10 +106,9 @@ const MarketTrade = () => {
       />
       <Header />
 
-      {/* 12-column grid: 3 / 6 / 3 — fills remaining viewport */}
       <div className="flex-1 min-h-0 grid grid-cols-12 overflow-hidden">
 
-        {/* ── Left (3 cols): scrollable market list ── */}
+        {/* Left: market list */}
         <div className="col-span-3 border-r border-border hidden md:flex flex-col overflow-hidden">
           <div className="p-3 border-b border-border flex items-center gap-2">
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => navigate("/markets")}>
@@ -103,14 +132,27 @@ const MarketTrade = () => {
           </ScrollArea>
         </div>
 
-        {/* ── Center (6 cols): chart → orderbook → positions ── */}
+        {/* Center: chart + timeline + panels */}
         <div className="col-span-12 md:col-span-6 flex flex-col overflow-hidden">
           {/* Resolution Chart */}
           <div className="flex-1 min-h-0">
-            <ResolutionChart asset={selected.asset} timeframe={selected.timeframe} />
+            <ResolutionChart
+              asset={selected.asset}
+              timeframe={selected.timeframe}
+              periodStart={activeSlotState !== "current" ? activeSlotStart : undefined}
+              periodEnd={activeSlotState !== "current" ? (selectedSlot?.end ?? undefined) : undefined}
+              periodState={activeSlotState}
+            />
           </div>
 
-          {/* Collapsible AI analyzer */}
+          {/* Period Timeline */}
+          <PeriodTimeline
+            timeframe={selected.timeframe}
+            selectedStart={activeSlotStart}
+            onSelect={setSelectedSlot}
+          />
+
+          {/* AI analyzer */}
           <AIMarketAnalyzer
             asset={selected.asset}
             timeframe={selected.timeframe}
@@ -121,11 +163,9 @@ const MarketTrade = () => {
             onToggle={() => togglePanel("ai")}
           />
 
-          {/* Collapsible side-by-side order book */}
           <OrderBookMini yesProb={yesProb} side={activeSide} onPriceClick={setClickedPrice} isOpen={openPanel === "orderbook"} onToggle={() => togglePanel("orderbook")} />
           <PositionManagement />
 
-          {/* Mobile back */}
           <div className="md:hidden p-3 border-t border-border">
             <Button variant="outline" size="sm" onClick={() => navigate("/markets")} className="w-full">
               <ArrowLeft className="w-4 h-4 mr-2" /> Back to Markets
@@ -133,7 +173,7 @@ const MarketTrade = () => {
           </div>
         </div>
 
-        {/* ── Right (3 cols): order form + rules (fixed, no scroll) ── */}
+        {/* Right: order form + rules */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
           <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
           <div className="border-t border-border" />
@@ -141,14 +181,11 @@ const MarketTrade = () => {
         </div>
       </div>
 
-      {/* ── Mobile FAB + Bottom Sheet for Order Form ── */}
+      {/* Mobile FAB */}
       <div className="lg:hidden fixed bottom-20 right-4 z-50">
         <Drawer>
           <DrawerTrigger asChild>
-            <Button
-              size="icon"
-              className="h-14 w-14 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90"
-            >
+            <Button size="icon" className="h-14 w-14 rounded-full shadow-lg bg-primary text-primary-foreground hover:bg-primary/90">
               <ShoppingCart className="w-6 h-6" />
             </Button>
           </DrawerTrigger>
