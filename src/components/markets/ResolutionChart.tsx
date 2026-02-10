@@ -261,8 +261,24 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       ctx.setLineDash([8, 4]); ctx.strokeStyle = BASELINE_CLR; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.moveTo(PAD.left, blY); ctx.lineTo(w - PAD.right, blY); ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = BASELINE_CLR; ctx.font = "bold 10px system-ui,sans-serif"; ctx.textAlign = "left";
-      ctx.fillText(`Price to beat  ${fmtPrice(baseline)}`, w - PAD.right + 4, blY - 6);
+
+      // Baseline label — centered pill on the line
+      const blLabel = `Price to beat  ${fmtPrice(baseline)}`;
+      ctx.font = "bold 10px system-ui,sans-serif";
+      const blLabelW = ctx.measureText(blLabel).width;
+      const blLabelX = PAD.left + (chartW - blLabelW) / 2;
+      const pillPadX = 8, pillPadY = 4, pillH = 16;
+      // Background pill
+      ctx.fillStyle = "rgba(15,23,42,0.88)";
+      ctx.beginPath();
+      const pillR = 4;
+      const px = blLabelX - pillPadX, py = blY - pillH / 2 - pillPadY / 2;
+      const pw = blLabelW + pillPadX * 2, ph = pillH + pillPadY;
+      ctx.roundRect(px, py, pw, ph, pillR);
+      ctx.fill();
+      // Text
+      ctx.fillStyle = BASELINE_CLR; ctx.textAlign = "left";
+      ctx.fillText(blLabel, blLabelX, blY + 4);
 
       /* Price line */
       const lastPrice = pts[pts.length - 1].price;
