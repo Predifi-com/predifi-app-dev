@@ -5,17 +5,8 @@ interface MarketRulesProps {
   timeframe: "hourly" | "daily";
 }
 
-const TRADINGVIEW_SYMBOLS: Record<string, string> = {
-  BTC: "COINBASE:BTCUSD",
-  ETH: "COINBASE:ETHUSD",
-  SOL: "COINBASE:SOLUSD",
-  DOGE: "COINBASE:DOGEUSD",
-  XRP: "COINBASE:XRPUSD",
-};
-
 export function MarketRules({ asset, timeframe }: MarketRulesProps) {
-  const tvSymbol = TRADINGVIEW_SYMBOLS[asset] || `COINBASE:${asset}USD`;
-  const tvUrl = `https://www.tradingview.com/chart/?symbol=${tvSymbol}`;
+  const tvUrl = `https://in.tradingview.com/symbols/${asset}USD/?exchange=COINBASE`;
 
   return (
     <div className="p-3 space-y-3">
