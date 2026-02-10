@@ -14,7 +14,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ArrowLeft, ShoppingCart } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Drawer, DrawerContent, DrawerTrigger } from "@/components/ui/drawer";
-import { useCoinbaseCandles } from "@/hooks/useCoinbaseCandles";
+import { useMarketBaseline } from "@/hooks/useMarketBaseline";
+import { usePriceTicker } from "@/hooks/usePriceTicker";
 
 const ASSETS = ["BTC", "ETH", "SOL", "DOGE", "XRP"] as const;
 const TIMEFRAMES = ["hourly", "daily"] as const;
@@ -32,12 +33,12 @@ function buildOrderedList() {
 const ORDERED_MARKETS = buildOrderedList();
 
 function useMarketData(asset: string, timeframe: "hourly" | "daily") {
-  const data = useCoinbaseCandles(asset);
-  const baseline = timeframe === "daily" ? data.dailyBaseline : data.hourlyBaseline;
-  const yesProb = (baseline <= 0 || data.currentPrice <= 0)
+  const { baseline } = useMarketBaseline(asset, timeframe);
+  const { price: currentPrice } = usePriceTicker(asset);
+  const yesProb = (baseline <= 0 || currentPrice <= 0)
     ? 50
-    : Math.min(95, Math.max(5, 50 + ((data.currentPrice - baseline) / baseline) * 100 * 25));
-  return { yesProb, baseline, currentPrice: data.currentPrice };
+    : Math.min(95, Math.max(5, 50 + ((currentPrice - baseline) / baseline) * 100 * 25));
+  return { yesProb, baseline, currentPrice };
 }
 
 function parseSlug(slug: string): { asset: string; timeframe: "hourly" | "daily" } | null {

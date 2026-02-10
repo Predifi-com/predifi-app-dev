@@ -1,73 +1,68 @@
 import { useMemo } from "react";
-import { useCoinbaseCandles, formatPrice, formatCloseTime, buildMarketQuestion } from "@/hooks/useCoinbaseCandles";
+import { useMarketBaseline } from "@/hooks/useMarketBaseline";
+import { usePriceTicker } from "@/hooks/usePriceTicker";
 import { cn } from "@/lib/utils";
 import { Clock, Loader2 } from "lucide-react";
-import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, ReferenceLine, Tooltip } from "recharts";
 
 interface CoinbaseMarketCardProps {
   asset: string;
   timeframe: "hourly" | "daily";
   isSelected?: boolean;
-  /** If true, render a compact version for sidebar lists */
   compact?: boolean;
-  /** If true, render an expanded version with larger chart */
   expanded?: boolean;
   onClick?: (e: React.MouseEvent) => void;
 }
 
+function formatPrice(price: number): string {
+  if (price >= 1000) return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (price >= 1) return price.toFixed(4);
+  return price.toFixed(6);
+}
+
+/**
+ * CoinbaseMarketCard — uses shared baseline cache + WebSocket ticker.
+ * NO candle fetching. NO Coinbase REST polling.
+ */
 export function CoinbaseMarketCard({ asset, timeframe, isSelected = false, compact = false, expanded = false, onClick }: CoinbaseMarketCardProps) {
-  const data = useCoinbaseCandles(asset);
+  const { baseline, periodEnd, isLoading: baselineLoading } = useMarketBaseline(asset, timeframe);
+  const { price: currentPrice } = usePriceTicker(asset);
   const isDaily = timeframe === "daily";
 
-  const baseline = isDaily ? data.dailyBaseline : data.hourlyBaseline;
-  const closeTime = isDaily ? data.dailyCloseTime : data.hourlyCloseTime;
-  const question = useMemo(
-    () => (baseline > 0 ? buildMarketQuestion(asset, baseline, closeTime, timeframe) : `${asset} market loading...`),
-    [asset, baseline, closeTime, timeframe]
-  );
+  const closeTime = useMemo(() => new Date(periodEnd), [periodEnd]);
+
+  const question = useMemo(() => {
+    if (baseline <= 0) return `${asset} market loading...`;
+    const fmtBl = formatPrice(baseline);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const d = closeTime;
+    const dateStr = `${months[d.getUTCMonth()]}-${String(d.getUTCDate()).padStart(2, "0")}-${d.getUTCFullYear()} ${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+    return `${asset} will close above $${fmtBl} at ${dateStr}?`;
+  }, [asset, baseline, closeTime]);
 
   const yesProb = useMemo(() => {
-    if (baseline <= 0 || data.currentPrice <= 0) return 50;
-    const diff = ((data.currentPrice - baseline) / baseline) * 100;
+    if (baseline <= 0 || currentPrice <= 0) return 50;
+    const diff = ((currentPrice - baseline) / baseline) * 100;
     return Math.min(95, Math.max(5, 50 + diff * 25));
-  }, [data.currentPrice, baseline]);
+  }, [currentPrice, baseline]);
 
   const noProb = 100 - yesProb;
 
-  const chartData = useMemo(() => {
-    const source = isDaily ? data.dailyCandles : data.candles;
-    return source.map((c) => ({
-      time: new Date(c.timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      price: c.close,
-    }));
-  }, [data.candles, data.dailyCandles, isDaily]);
-
   const timeLeftText = useMemo(() => {
-    const diff = closeTime.getTime() - Date.now();
+    const diff = periodEnd - Date.now();
     if (diff <= 0) return "Closing...";
     const mins = Math.floor(diff / 60000);
     if (mins < 60) return `${mins}m left`;
     const hrs = Math.floor(mins / 60);
     if (hrs < 24) return `${hrs}h ${mins % 60}m left`;
     return `${Math.floor(hrs / 24)}d ${hrs % 24}h left`;
-  }, [closeTime]);
+  }, [periodEnd]);
 
-  const priceColor = data.currentPrice >= baseline ? "text-emerald-500" : "text-red-500";
-  const chartColor = data.currentPrice >= baseline ? "hsl(152, 69%, 53%)" : "hsl(0, 84%, 60%)";
-  const chartHeight = expanded ? 320 : compact ? 50 : 80;
+  const priceColor = currentPrice >= baseline ? "text-emerald-500" : "text-red-500";
 
-  if (data.isLoading) {
+  if (baselineLoading && currentPrice === 0) {
     return (
-      <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-center min-h-[120px]">
-        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (data.error) {
-    return (
-      <div className="rounded-xl border border-border bg-card p-4 min-h-[120px] flex flex-col items-center justify-center">
-        <span className="text-xs text-destructive">{asset} — Failed to load</span>
+      <div className="rounded-xl border border-border bg-card p-4 flex items-center justify-center min-h-[80px]">
+        <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
       </div>
     );
   }
@@ -107,61 +102,11 @@ export function CoinbaseMarketCard({ asset, timeframe, isSelected = false, compa
         {question}
       </h3>
 
-      {/* Chart with baseline */}
-      {chartData.length > 1 && !compact && (
-        <div className="mb-3 -mx-1">
-          <ResponsiveContainer width="100%" height={chartHeight}>
-            <AreaChart data={chartData} margin={{ top: 4, right: 4, left: 4, bottom: 0 }}>
-              <defs>
-                <linearGradient id={`grad-${asset}-${timeframe}`} x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={chartColor} stopOpacity={0.25} />
-                  <stop offset="95%" stopColor={chartColor} stopOpacity={0} />
-                </linearGradient>
-              </defs>
-              <YAxis domain={["dataMin", "dataMax"]} hide />
-              <XAxis dataKey="time" hide={!expanded} tick={expanded ? { fill: "hsl(var(--muted-foreground))", fontSize: 10 } : undefined} tickLine={false} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "6px",
-                  fontSize: "11px",
-                  padding: "4px 8px",
-                }}
-                formatter={(value: number) => [`$${formatPrice(value)}`, ""]}
-                labelFormatter={() => ""}
-              />
-              <ReferenceLine
-                y={baseline}
-                stroke="hsl(var(--primary))"
-                strokeDasharray="6 3"
-                strokeWidth={1.5}
-                label={{
-                  value: `$${formatPrice(baseline)}`,
-                  position: "right",
-                  fill: "hsl(var(--primary))",
-                  fontSize: expanded ? 11 : 9,
-                  fontWeight: 600,
-                }}
-              />
-              <Area
-                type="monotone"
-                dataKey="price"
-                stroke={chartColor}
-                fill={`url(#grad-${asset}-${timeframe})`}
-                strokeWidth={1.5}
-                dot={false}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
       {/* Current price */}
       <div className="flex items-center justify-between text-xs mb-2">
         <span className="text-muted-foreground">Current</span>
         <span className={cn("font-bold tabular-nums", priceColor)}>
-          ${formatPrice(data.currentPrice)}
+          ${formatPrice(currentPrice)}
         </span>
       </div>
 
