@@ -35,11 +35,12 @@ export function CoinbaseMarketCard({ asset, timeframe, isSelected = false, compa
   const noProb = 100 - yesProb;
 
   const chartData = useMemo(() => {
-    return data.candles.map((c) => ({
+    const source = isDaily ? data.dailyCandles : data.candles;
+    return source.map((c) => ({
       time: new Date(c.timestamp * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       price: c.close,
     }));
-  }, [data.candles]);
+  }, [data.candles, data.dailyCandles, isDaily]);
 
   const timeLeftText = useMemo(() => {
     const diff = closeTime.getTime() - Date.now();

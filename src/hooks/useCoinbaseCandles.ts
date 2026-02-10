@@ -12,12 +12,13 @@ export interface CoinbaseCandle {
 export interface CoinbaseAssetData {
   asset: string;
   pair: string;
-  candles: CoinbaseCandle[];
+  candles: CoinbaseCandle[];       // 1-min candles (last 60 min) for hourly
+  dailyCandles: CoinbaseCandle[];  // 5-min candles from 00:00 UTC today for daily
   currentPrice: number;
-  hourlyBaseline: number;  // last completed hourly candle close
-  dailyBaseline: number;   // last completed daily candle close
-  hourlyCloseTime: Date;   // current hourly candle close time
-  dailyCloseTime: Date;    // current daily candle close time
+  hourlyBaseline: number;
+  dailyBaseline: number;
+  hourlyCloseTime: Date;
+  dailyCloseTime: Date;
   isLoading: boolean;
   error: string | null;
 }
@@ -47,8 +48,30 @@ async function fetchCandles(pair: string, granularity: number = 60, count: numbe
 
   const raw: number[][] = await res.json();
 
-  // Coinbase format: [timestamp, low, high, open, close, volume]
-  // Returns newest first, so reverse for chronological order
+  return raw
+    .map(([ts, low, high, open, close, volume]) => ({
+      timestamp: ts,
+      open,
+      high,
+      low,
+      close,
+      volume,
+    }))
+    .reverse();
+}
+
+/**
+ * Fetch candles from a specific start time to now.
+ */
+async function fetchCandlesSince(pair: string, granularity: number, since: Date): Promise<CoinbaseCandle[]> {
+  const end = new Date();
+  const url = `${COINBASE_API}/products/${pair}/candles?granularity=${granularity}&start=${since.toISOString()}&end=${end.toISOString()}`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Coinbase API error: ${res.status}`);
+
+  const raw: number[][] = await res.json();
+
   return raw
     .map(([ts, low, high, open, close, volume]) => ({
       timestamp: ts,
@@ -121,6 +144,7 @@ export function useCoinbaseCandles(asset: string) {
     asset,
     pair,
     candles: [],
+    dailyCandles: [],
     currentPrice: 0,
     hourlyBaseline: 0,
     dailyBaseline: 0,
@@ -137,24 +161,34 @@ export function useCoinbaseCandles(asset: string) {
 
     const load = async () => {
       try {
-        // Fetch 1-min candles for the last 60 minutes
+        // Fetch 1-min candles for the last 60 minutes (hourly chart)
         const candles = await fetchCandles(pair, 60, 60);
         if (cancelled) return;
 
         const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : 0;
         const hourlyBaseline = computeBaseline(candles, "hourly");
 
+        // Fetch 5-min candles from 00:00 UTC today (daily chart)
+        const todayMidnight = new Date();
+        todayMidnight.setUTCHours(0, 0, 0, 0);
+        let dailyChartCandles: CoinbaseCandle[] = [];
+        try {
+          dailyChartCandles = await fetchCandlesSince(pair, 300, todayMidnight);
+        } catch {
+          // fallback: empty
+        }
+        if (cancelled) return;
+
         // For daily baseline, fetch one daily candle
         let dailyBaseline = currentPrice;
         try {
-          const dailyCandles = await fetchCandles(pair, 86400, 2);
-          if (!cancelled && dailyCandles.length >= 2) {
-            dailyBaseline = dailyCandles[dailyCandles.length - 2].close; // previous day close
-          } else if (!cancelled && dailyCandles.length === 1) {
-            dailyBaseline = dailyCandles[0].open;
+          const dailyBaseCandles = await fetchCandles(pair, 86400, 2);
+          if (!cancelled && dailyBaseCandles.length >= 2) {
+            dailyBaseline = dailyBaseCandles[dailyBaseCandles.length - 2].close;
+          } else if (!cancelled && dailyBaseCandles.length === 1) {
+            dailyBaseline = dailyBaseCandles[0].open;
           }
         } catch {
-          // Fallback: use first candle open as daily baseline
           dailyBaseline = candles[0]?.open ?? currentPrice;
         }
 
@@ -162,6 +196,7 @@ export function useCoinbaseCandles(asset: string) {
           asset,
           pair,
           candles,
+          dailyCandles: dailyChartCandles,
           currentPrice,
           hourlyBaseline,
           dailyBaseline,
