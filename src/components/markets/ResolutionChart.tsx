@@ -113,9 +113,9 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       }
       pts.push({ time: now, price });
 
-      // Trim old points (keep max ~7200 for daily, ~3600 for hourly)
-      const maxPts = isDaily ? 7200 : 3600;
-      if (pts.length > maxPts) pts.splice(0, pts.length - maxPts);
+      // Trim old points — only keep 35s buffer for rolling 30s window
+      const cutoff = now - 35_000;
+      while (pts.length > 0 && pts[0].time < cutoff) pts.shift();
 
       // Update countdown
       const diff = Math.max(0, windowEnd - now);
@@ -178,15 +178,18 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
 
       const NOW = Date.now();
       const baseline = isLive ? baselineRef.current : pastBaseline;
+      const WINDOW = 30_000; // 30-second rolling heartbeat
 
-      /* Determine points + tMax */
+      /* Determine points, tMin, tMax */
       let pts: PricePoint[];
+      let tMin: number;
       let tMax: number;
 
       if (isLive) {
-        // CRITICAL: tMax = NOW, not end of period
+        // Rolling 30s window: tMax = NOW, tMin = NOW - 30s
         tMax = NOW;
-        pts = pointsRef.current.filter(p => p.time >= windowStart && p.time <= NOW);
+        tMin = NOW - WINDOW;
+        pts = pointsRef.current.filter(p => p.time >= tMin && p.time <= NOW);
 
         // Inject "now" point so line always reaches right edge
         const price = lastPriceRef.current;
@@ -202,10 +205,10 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
         }
       } else {
         pts = pastPoints;
+        tMin = windowStart;
         tMax = windowEnd;
       }
 
-      const tMin = windowStart;
       const tRange = Math.max(tMax - tMin, 1000);
       const chartW = w - PAD.left - PAD.right;
       const chartH = h - PAD.top - PAD.bottom;
@@ -223,12 +226,12 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       const toX = (t: number) => PAD.left + ((t - tMin) / tRange) * chartW;
       const toY = (p: number) => PAD.top + (1 - (p - yMin) / yRange) * chartH;
 
-      /* Y range */
+      /* Y range — ALWAYS include baseline so it never scrolls off */
       const prices = pts.map(p => p.price);
-      prices.push(baseline);
+      prices.push(baseline); // baseline is ALWAYS in Y range
       let yMin = Math.min(...prices);
       let yMax = Math.max(...prices);
-      const yPad = (yMax - yMin) * 0.15 || yMax * 0.002;
+      const yPad = (yMax - yMin) * 0.2 || yMax * 0.002;
       yMin -= yPad; yMax += yPad;
       const yRange = yMax - yMin || 1;
 
