@@ -8,6 +8,7 @@ import { NotificationsBell } from "@/components/NotificationsBell";
 import { UserAccountMenu } from "@/components/account/UserAccountMenu";
 import { ArenaEquityBadge } from "@/components/account/ArenaEquityBadge";
 import { DepositModal } from "@/components/account/DepositModal";
+import { MiniBalanceWidget } from "@/components/wallet/MiniBalanceWidget";
 
 import { Link, useLocation } from "react-router-dom";
 import { useWallet } from "@/hooks/useWallet";
@@ -192,6 +193,9 @@ const Header = () => {
 
           {/* Right Section */}
           <div className="flex items-center gap-1">
+            {/* Mini Balance Widget */}
+            {isConnected && <MiniBalanceWidget />}
+
             {/* Notifications */}
             {isConnected && <NotificationsBell />}
 
