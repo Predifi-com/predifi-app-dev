@@ -36,6 +36,7 @@ const TraderProfile = lazy(() => import("@/pages/arena/TraderProfile"));
 const CompetitorHome = lazy(() => import("@/pages/arena/CompetitorHome"));
 const ArenaRegister = lazy(() => import("@/pages/arena/ArenaRegister"));
 const ArenaLearnMore = lazy(() => import("@/pages/arena/ArenaLearnMore"));
+const Wallet = lazy(() => import("@/pages/Wallet"));
 
 export type SkeletonType = "default" | "detail" | "table" | "dashboard";
 export type TransitionType = "page" | "slide";
@@ -94,6 +95,7 @@ export const protectedRoutes: RouteConfig[] = [
   { path: "/rewards", component: Rewards, transition: "page" },
   { path: "/games", component: Games, transition: "page" },
   { path: "/settings", component: Settings, transition: "page" },
+  { path: "/wallet", component: Wallet, transition: "page" },
   { path: "/admin", component: Admin, skeleton: "dashboard", transition: "page" },
 ];
 

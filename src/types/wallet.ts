@@ -37,3 +37,46 @@ export interface TransactionReceipt {
   blockNumber?: number;
   gasUsed?: bigint;
 }
+
+// ── Wallet Balance & Transaction types ──
+
+export interface WalletBalance {
+  available: number;
+  locked: number;
+  pending: number;
+  total: number;
+  lastUpdated: Date;
+}
+
+export interface WalletTransaction {
+  id: string;
+  type: 'deposit' | 'withdrawal' | 'trade' | 'settlement';
+  amount: number;
+  status: 'pending' | 'processing' | 'confirmed' | 'failed';
+  txHash?: string;
+  destination?: string;
+  timestamp: Date;
+  confirmations?: number;
+  error?: string;
+}
+
+export interface DepositAddress {
+  address: string;
+  network: 'optimism' | 'base' | 'polygon';
+  chainId: number;
+}
+
+export interface WithdrawalRequest {
+  amount: number;
+  destination: string;
+  estimatedTime: string;
+  phase: 'initiating' | 'processing' | 'confirming' | 'complete';
+}
+
+export interface WalletAPI {
+  getBalance(): Promise<WalletBalance>;
+  getDepositAddress(): Promise<DepositAddress>;
+  deposit(amount: number): Promise<WalletTransaction>;
+  withdraw(amount: number, address: string): Promise<WalletTransaction>;
+  getTransactions(limit?: number): Promise<WalletTransaction[]>;
+}
