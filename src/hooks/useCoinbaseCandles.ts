@@ -161,8 +161,10 @@ export function useCoinbaseCandles(asset: string) {
 
     const load = async () => {
       try {
-        // Fetch 1-min candles for the last 60 minutes (hourly chart)
-        const candles = await fetchCandles(pair, 60, 60);
+        // Fetch 1-min candles from start of current hour (hourly chart)
+        const currentHourStart = new Date();
+        currentHourStart.setUTCMinutes(0, 0, 0);
+        const candles = await fetchCandlesSince(pair, 60, currentHourStart);
         if (cancelled) return;
 
         const currentPrice = candles.length > 0 ? candles[candles.length - 1].close : 0;
