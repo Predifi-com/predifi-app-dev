@@ -1,357 +1,331 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useMemo } from "react";
 import { useCoinbaseCandles, formatPrice, CoinbaseCandle } from "@/hooks/useCoinbaseCandles";
 import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 
+/* ── Types ── */
 interface ResolutionChartProps {
   asset: string;
   timeframe: "hourly" | "daily";
-  /** Override: if set, renders a static chart for a past/future period instead of the live one */
   periodStart?: number;
   periodEnd?: number;
   periodState?: "past" | "current" | "future";
 }
 
 interface PricePoint {
-  time: number;
+  time: number; // ms
   price: number;
 }
 
-const PADDING = { top: 30, right: 80, bottom: 30, left: 12 };
-const BASELINE_COLOR = "#6366f1";
+/* ── Constants ── */
+const PAD = { top: 30, right: 80, bottom: 30, left: 12 };
 const GREEN = "#22c55e";
 const RED = "#ef4444";
-const GRID_COLOR = "rgba(148,163,184,0.15)";
-const TEXT_COLOR = "rgba(148,163,184,0.8)";
+const BASELINE_CLR = "#6366f1";
+const GRID_CLR = "rgba(148,163,184,0.15)";
+const TEXT_CLR = "rgba(148,163,184,0.8)";
 
-function formatChartPrice(price: number): string {
-  if (price >= 1000) return "$" + price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-  if (price >= 1) return "$" + price.toFixed(4);
-  return "$" + price.toFixed(6);
+const COINBASE_API = "https://api.exchange.coinbase.com";
+const PAIR_MAP: Record<string, string> = {
+  BTC: "BTC-USD", ETH: "ETH-USD", SOL: "SOL-USD", DOGE: "DOGE-USD", XRP: "XRP-USD",
+};
+
+/* ── Helpers ── */
+function fmtPrice(p: number) {
+  if (p >= 1000) return "$" + p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (p >= 1) return "$" + p.toFixed(4);
+  return "$" + p.toFixed(6);
 }
 
-function formatTimeLabel(ms: number): string {
+function fmtTime(ms: number) {
   const d = new Date(ms);
   return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
 }
 
-const COINBASE_API = "https://api.exchange.coinbase.com";
-const ASSET_PAIRS: Record<string, string> = {
-  BTC: "BTC-USD", ETH: "ETH-USD", SOL: "SOL-USD", DOGE: "DOGE-USD", XRP: "XRP-USD",
-};
-
-async function fetchCandlesRange(pair: string, granularity: number, start: Date, end: Date): Promise<CoinbaseCandle[]> {
-  const url = `${COINBASE_API}/products/${pair}/candles?granularity=${granularity}&start=${start.toISOString()}&end=${end.toISOString()}`;
+async function fetchRange(pair: string, gran: number, start: Date, end: Date): Promise<CoinbaseCandle[]> {
+  const url = `${COINBASE_API}/products/${pair}/candles?granularity=${gran}&start=${start.toISOString()}&end=${end.toISOString()}`;
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`Coinbase API error: ${res.status}`);
+  if (!res.ok) throw new Error(`Coinbase ${res.status}`);
   const raw: number[][] = await res.json();
-  return raw
-    .map(([ts, low, high, open, close, volume]) => ({ timestamp: ts, open, high, low, close, volume }))
-    .reverse();
+  return raw.map(([ts, low, high, open, close, volume]) => ({ timestamp: ts, open, high, low, close, volume })).reverse();
 }
 
+/* ═══════════════════════════════════════════════════════
+   ResolutionChart — time-progressive countdown chart
+   ═══════════════════════════════════════════════════════ */
 export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, periodState = "current" }: ResolutionChartProps) {
   const data = useCoinbaseCandles(asset);
   const isDaily = timeframe === "daily";
-  const pair = ASSET_PAIRS[asset] || `${asset}-USD`;
+  const pair = PAIR_MAP[asset] || `${asset}-USD`;
 
   const isLive = periodState === "current";
   const isFuture = periodState === "future";
 
-  // ── Determine window ──
-  const liveWindowStart = useMemo(() => {
-    const now = new Date();
-    if (isDaily) { now.setUTCHours(0, 0, 0, 0); }
-    else { now.setUTCMinutes(0, 0, 0); }
-    return now.getTime();
+  /* ── Period boundaries ── */
+  const liveStart = useMemo(() => {
+    const d = new Date();
+    if (isDaily) d.setUTCHours(0, 0, 0, 0);
+    else d.setUTCMinutes(0, 0, 0);
+    return d.getTime();
   }, [isDaily]);
 
-  const windowStart = periodStart ?? liveWindowStart;
+  const windowStart = periodStart ?? liveStart;
   const windowEnd = periodEnd ?? (isDaily ? data.dailyCloseTime.getTime() : data.hourlyCloseTime.getTime());
 
-  // ── Baseline: always the close of the PREVIOUS period ──
-  // For live: use hook data. For past periods: fetch.
-  const [overrideBaseline, setOverrideBaseline] = useState<number | null>(null);
+  /* ── Refs for animation-loop data (never cause re-renders) ── */
+  const pointsRef = useRef<PricePoint[]>([]);
+  const baselineRef = useRef(0);
+  const lastPriceRef = useRef(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rafRef = useRef(0);
+  const tickerRef = useRef<ReturnType<typeof setInterval>>();
+
+  /* ── Past-period state ── */
   const [pastPoints, setPastPoints] = useState<PricePoint[]>([]);
+  const [pastBaseline, setPastBaseline] = useState(0);
   const [pastLoading, setPastLoading] = useState(false);
 
-  // Fetch data for past periods
+  /* ── Countdown (for header display only) ── */
+  const [countdown, setCountdown] = useState({ m: 0, s: 0 });
+
+  /* ═══ LIVE: sync baseline + candle data from hook into refs ═══ */
   useEffect(() => {
-    if (isLive || isFuture) {
-      setOverrideBaseline(null);
-      setPastPoints([]);
-      return;
-    }
-
-    let cancelled = false;
-    setPastLoading(true);
-
-    (async () => {
-      try {
-        const periodMs = windowEnd - windowStart;
-        const granularity = periodMs > 4 * 3600 * 1000 ? 300 : 60;
-
-        // Fetch baseline: last candle before this period
-        const baselineStart = new Date(windowStart - (granularity === 300 ? 30 * 60 * 1000 : 5 * 60 * 1000));
-        const baselineEnd = new Date(windowStart);
-        const baselineCandles = await fetchCandlesRange(pair, granularity, baselineStart, baselineEnd);
-        if (cancelled) return;
-
-        const bl = baselineCandles.length > 0 ? baselineCandles[baselineCandles.length - 1].close : 0;
-        setOverrideBaseline(bl);
-
-        // Fetch chart data for the period
-        const chartCandles = await fetchCandlesRange(pair, granularity, new Date(windowStart), new Date(windowEnd));
-        if (cancelled) return;
-
-        setPastPoints(chartCandles.map(c => ({ time: c.timestamp * 1000, price: c.close })));
-      } catch (err) {
-        console.error("Failed to load past period:", err);
-      } finally {
-        if (!cancelled) setPastLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [isLive, isFuture, windowStart, windowEnd, pair]);
-
-  const baseline = overrideBaseline ?? (isDaily ? data.dailyBaseline : data.hourlyBaseline);
-
-  // ── Live points buffer ──
-  const pointsRef = useRef<PricePoint[]>([]);
-  const lastKnownPriceRef = useRef(0);
+    if (!isLive) return;
+    const bl = isDaily ? data.dailyBaseline : data.hourlyBaseline;
+    if (bl > 0) baselineRef.current = bl;
+  }, [isLive, isDaily, data.hourlyBaseline, data.dailyBaseline]);
 
   useEffect(() => {
     if (!isLive) return;
     const source = isDaily ? data.dailyCandles : data.candles;
     if (source.length === 0) return;
-    const newPoints: PricePoint[] = source
-      .filter((c) => c.timestamp * 1000 >= windowStart)
-      .map((c) => ({ time: c.timestamp * 1000, price: c.close }));
-    const lastCandleTime = newPoints.length > 0 ? newPoints[newPoints.length - 1].time : 0;
-    const existingFine = pointsRef.current.filter((p) => p.time > lastCandleTime);
-    pointsRef.current = [...newPoints, ...existingFine];
-    lastKnownPriceRef.current = data.currentPrice;
-  }, [data.candles, data.dailyCandles, data.currentPrice, isDaily, windowStart, isLive]);
+    // Rebuild points from candles (within current period)
+    const pts: PricePoint[] = source
+      .filter(c => c.timestamp * 1000 >= windowStart)
+      .map(c => ({ time: c.timestamp * 1000, price: c.close }));
+    pointsRef.current = pts;
+    if (data.currentPrice > 0) lastPriceRef.current = data.currentPrice;
+  }, [isLive, isDaily, data.candles, data.dailyCandles, data.currentPrice, windowStart]);
 
-  useEffect(() => {
-    if (data.currentPrice > 0 && isLive) lastKnownPriceRef.current = data.currentPrice;
-  }, [data.currentPrice, isLive]);
-
-  // ── Canvas ──
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const animFrameRef = useRef<number>(0);
-
-  const [countdown, setCountdown] = useState({ mins: 0, secs: 0 });
-
-  // ── Render ──
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
-
-    const dpr = window.devicePixelRatio || 1;
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-    if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-      canvas.width = w * dpr;
-      canvas.height = h * dpr;
-      canvas.style.width = w + "px";
-      canvas.style.height = h + "px";
-    }
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, w, h);
-
-    const now = Date.now();
-
-    // Get the right points
-    let points: PricePoint[];
-    let tMax: number;
-
-    if (isLive) {
-      // Inject NOW point
-      const price = lastKnownPriceRef.current;
-      if (price > 0) {
-        const pts = pointsRef.current;
-        if (pts.length === 0 || pts[pts.length - 1].time < now - 500) {
-          pts.push({ time: now, price });
-        } else {
-          pts[pts.length - 1] = { time: now, price };
-        }
-      }
-      points = pointsRef.current.filter((p) => p.time >= windowStart && p.time <= now);
-      tMax = now;
-    } else {
-      points = pastPoints;
-      tMax = windowEnd;
-    }
-
-    if (points.length < 1 || baseline <= 0) {
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.font = "12px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      if (isFuture) {
-        ctx.fillText("Market opens soon", w / 2, h / 2);
-      } else {
-        ctx.fillText("Waiting for price data…", w / 2, h / 2);
-      }
-      if (isLive) animFrameRef.current = requestAnimationFrame(draw);
-      return;
-    }
-
-    const chartW = w - PADDING.left - PADDING.right;
-    const chartH = h - PADDING.top - PADDING.bottom;
-    const tMin = windowStart;
-    const tRange = Math.max(tMax - tMin, 1000);
-
-    const allPrices = points.map((p) => p.price);
-    allPrices.push(baseline);
-    let yMin = Math.min(...allPrices);
-    let yMax = Math.max(...allPrices);
-    const yPad = (yMax - yMin) * 0.15 || yMax * 0.002;
-    yMin -= yPad;
-    yMax += yPad;
-    const yRange = yMax - yMin || 1;
-
-    const toX = (t: number) => PADDING.left + ((t - tMin) / tRange) * chartW;
-    const toY = (p: number) => PADDING.top + (1 - (p - yMin) / yRange) * chartH;
-
-    // Grid
-    ctx.strokeStyle = GRID_COLOR;
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 5; i++) {
-      const yVal = yMin + (i / 5) * yRange;
-      const y = toY(yVal);
-      ctx.beginPath();
-      ctx.moveTo(PADDING.left, y);
-      ctx.lineTo(w - PADDING.right, y);
-      ctx.stroke();
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.font = "10px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(formatChartPrice(yVal), w - PADDING.right + 4, y + 3);
-    }
-
-    // X labels
-    const xTicks = Math.min(8, Math.floor(chartW / 80));
-    for (let i = 0; i <= xTicks; i++) {
-      const t = tMin + (i / xTicks) * tRange;
-      ctx.fillStyle = TEXT_COLOR;
-      ctx.font = "10px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(formatTimeLabel(t), toX(t), h - 8);
-    }
-
-    // Baseline
-    const baselineY = toY(baseline);
-    ctx.setLineDash([8, 4]);
-    ctx.strokeStyle = BASELINE_COLOR;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(PADDING.left, baselineY);
-    ctx.lineTo(w - PADDING.right, baselineY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-    ctx.fillStyle = BASELINE_COLOR;
-    ctx.font = "bold 10px system-ui, sans-serif";
-    ctx.textAlign = "left";
-    ctx.fillText(`Price to beat  ${formatChartPrice(baseline)}`, w - PADDING.right + 4, baselineY - 6);
-
-    // Price line
-    const lastPrice = points[points.length - 1].price;
-    const isAbove = lastPrice >= baseline;
-    const color = isAbove ? GREEN : RED;
-
-    const gradient = ctx.createLinearGradient(0, PADDING.top, 0, h - PADDING.bottom);
-    gradient.addColorStop(0, isAbove ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)");
-    gradient.addColorStop(1, "rgba(0,0,0,0)");
-
-    ctx.beginPath();
-    ctx.moveTo(toX(points[0].time), toY(points[0].price));
-    for (let i = 1; i < points.length; i++) ctx.lineTo(toX(points[i].time), toY(points[i].price));
-    ctx.lineTo(toX(points[points.length - 1].time), h - PADDING.bottom);
-    ctx.lineTo(toX(points[0].time), h - PADDING.bottom);
-    ctx.closePath();
-    ctx.fillStyle = gradient;
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.moveTo(toX(points[0].time), toY(points[0].price));
-    for (let i = 1; i < points.length; i++) ctx.lineTo(toX(points[i].time), toY(points[i].price));
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.stroke();
-
-    // Live dot
-    if (isLive) {
-      const lastPt = points[points.length - 1];
-      const lx = toX(lastPt.time);
-      const ly = toY(lastPt.price);
-      const pulse = (Math.sin(now / 400) + 1) / 2;
-      ctx.beginPath();
-      ctx.arc(lx, ly, 6 + pulse * 6, 0, Math.PI * 2);
-      ctx.fillStyle = isAbove ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)";
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(lx, ly, 4, 0, Math.PI * 2);
-      ctx.fillStyle = color;
-      ctx.fill();
-      ctx.strokeStyle = "#fff";
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
-      ctx.fillStyle = color;
-      ctx.font = "bold 11px system-ui, sans-serif";
-      ctx.textAlign = "left";
-      ctx.fillText(formatChartPrice(lastPt.price), lx + 10, ly + 4);
-    }
-
-    // Resolved badge for past periods
-    if (!isLive && !isFuture && points.length > 0) {
-      const finalPrice = points[points.length - 1].price;
-      const resolved = finalPrice >= baseline ? "YES" : "NO";
-      const badgeColor = resolved === "YES" ? GREEN : RED;
-      ctx.fillStyle = badgeColor;
-      ctx.font = "bold 14px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(`Resolved: ${resolved}`, w / 2, PADDING.top - 8);
-    }
-
-    if (isLive) animFrameRef.current = requestAnimationFrame(draw);
-  }, [baseline, windowStart, windowEnd, isLive, isFuture, pastPoints]);
-
-  useEffect(() => {
-    animFrameRef.current = requestAnimationFrame(draw);
-    return () => { if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current); };
-  }, [draw]);
-
-  // For past periods, draw once when data arrives
-  useEffect(() => {
-    if (!isLive && pastPoints.length > 0) {
-      requestAnimationFrame(draw);
-    }
-  }, [pastPoints, draw, isLive]);
-
-  // Countdown
+  /* ═══ LIVE: 1-second ticker — injects a synthetic point every second ═══ */
   useEffect(() => {
     if (!isLive) return;
     const tick = () => {
-      const diff = Math.max(0, windowEnd - Date.now());
+      const now = Date.now();
+      const price = lastPriceRef.current;
+      if (price <= 0) return;
+      // Append a new point at the current timestamp
+      const pts = pointsRef.current;
+      // Remove any previous synthetic point (within last 1.5s) to avoid duplicates
+      while (pts.length > 0 && pts[pts.length - 1].time > now - 1500) {
+        // If it's a candle-origin point (older than 2s from now), keep it
+        if (now - pts[pts.length - 1].time > 2000) break;
+        pts.pop();
+      }
+      pts.push({ time: now, price });
+
+      // Update countdown
+      const diff = Math.max(0, windowEnd - now);
       const totalSecs = Math.floor(diff / 1000);
-      setCountdown({ mins: Math.floor(totalSecs / 60), secs: totalSecs % 60 });
+      setCountdown({ m: Math.floor(totalSecs / 60), s: totalSecs % 60 });
     };
     tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, [windowEnd, isLive]);
+    tickerRef.current = setInterval(tick, 1000);
+    return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
+  }, [isLive, windowEnd]);
 
+  /* ═══ PAST: fetch historical data ═══ */
+  useEffect(() => {
+    if (isLive || isFuture) { setPastPoints([]); setPastBaseline(0); return; }
+    let dead = false;
+    setPastLoading(true);
+    (async () => {
+      try {
+        const span = windowEnd - windowStart;
+        const gran = span > 4 * 3600_000 ? 300 : 60;
+        // Baseline: last candle before this period
+        const blStart = new Date(windowStart - (gran === 300 ? 30 * 60_000 : 5 * 60_000));
+        const blCandles = await fetchRange(pair, gran, blStart, new Date(windowStart));
+        if (dead) return;
+        const bl = blCandles.length > 0 ? blCandles[blCandles.length - 1].close : 0;
+        setPastBaseline(bl);
+        const chart = await fetchRange(pair, gran, new Date(windowStart), new Date(windowEnd));
+        if (dead) return;
+        setPastPoints(chart.map(c => ({ time: c.timestamp * 1000, price: c.close })));
+      } catch (e) { console.error("Past period load error:", e); }
+      finally { if (!dead) setPastLoading(false); }
+    })();
+    return () => { dead = true; };
+  }, [isLive, isFuture, windowStart, windowEnd, pair]);
+
+  /* ═══ RENDER LOOP ═══ */
+  useEffect(() => {
+    const render = () => {
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      if (!canvas || !container) { rafRef.current = requestAnimationFrame(render); return; }
+
+      const dpr = window.devicePixelRatio || 1;
+      const w = container.clientWidth;
+      const h = container.clientHeight;
+      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
+        canvas.width = w * dpr; canvas.height = h * dpr;
+        canvas.style.width = w + "px"; canvas.style.height = h + "px";
+      }
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { rafRef.current = requestAnimationFrame(render); return; }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, w, h);
+
+      const NOW = Date.now();
+      const baseline = isLive ? baselineRef.current : pastBaseline;
+
+      /* Determine points + tMax */
+      let pts: PricePoint[];
+      let tMax: number;
+
+      if (isLive) {
+        // CRITICAL: tMax = NOW, not end of period
+        tMax = NOW;
+        pts = pointsRef.current.filter(p => p.time >= windowStart && p.time <= NOW);
+
+        // Inject "now" point at exact current time so line always reaches right edge
+        const price = lastPriceRef.current;
+        if (price > 0 && pts.length > 0) {
+          const last = pts[pts.length - 1];
+          if (NOW - last.time > 100) {
+            pts.push({ time: NOW, price });
+          } else {
+            pts[pts.length - 1] = { time: NOW, price };
+          }
+        } else if (price > 0) {
+          pts = [{ time: NOW, price }];
+        }
+      } else {
+        pts = pastPoints;
+        tMax = windowEnd;
+      }
+
+      const tMin = windowStart;
+      const tRange = Math.max(tMax - tMin, 1000);
+      const chartW = w - PAD.left - PAD.right;
+      const chartH = h - PAD.top - PAD.bottom;
+
+      /* Empty state */
+      if (pts.length < 1 || baseline <= 0) {
+        ctx.fillStyle = TEXT_CLR;
+        ctx.font = "12px system-ui,sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(isFuture ? "Market opens soon" : "Waiting for price data…", w / 2, h / 2);
+        if (isLive) rafRef.current = requestAnimationFrame(render);
+        return;
+      }
+
+      const toX = (t: number) => PAD.left + ((t - tMin) / tRange) * chartW;
+      const toY = (p: number) => PAD.top + (1 - (p - yMin) / yRange) * chartH;
+
+      /* Y range */
+      const prices = pts.map(p => p.price);
+      prices.push(baseline);
+      let yMin = Math.min(...prices);
+      let yMax = Math.max(...prices);
+      const yPad = (yMax - yMin) * 0.15 || yMax * 0.002;
+      yMin -= yPad; yMax += yPad;
+      const yRange = yMax - yMin || 1;
+
+      /* Grid */
+      ctx.strokeStyle = GRID_CLR; ctx.lineWidth = 1;
+      for (let i = 0; i <= 5; i++) {
+        const yVal = yMin + (i / 5) * yRange;
+        const y = toY(yVal);
+        ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(w - PAD.right, y); ctx.stroke();
+        ctx.fillStyle = TEXT_CLR; ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "left";
+        ctx.fillText(fmtPrice(yVal), w - PAD.right + 4, y + 3);
+      }
+
+      /* X labels */
+      const xTicks = Math.min(6, Math.floor(chartW / 90));
+      for (let i = 0; i <= xTicks; i++) {
+        const t = tMin + (i / xTicks) * tRange;
+        ctx.fillStyle = TEXT_CLR; ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(fmtTime(t), toX(t), h - 8);
+      }
+
+      /* Baseline */
+      const blY = toY(baseline);
+      ctx.setLineDash([8, 4]); ctx.strokeStyle = BASELINE_CLR; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(PAD.left, blY); ctx.lineTo(w - PAD.right, blY); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = BASELINE_CLR; ctx.font = "bold 10px system-ui,sans-serif"; ctx.textAlign = "left";
+      ctx.fillText(`Price to beat  ${fmtPrice(baseline)}`, w - PAD.right + 4, blY - 6);
+
+      /* Price line */
+      const lastPrice = pts[pts.length - 1].price;
+      const above = lastPrice >= baseline;
+      const clr = above ? GREEN : RED;
+
+      // Fill
+      const grad = ctx.createLinearGradient(0, PAD.top, 0, h - PAD.bottom);
+      grad.addColorStop(0, above ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)");
+      grad.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.beginPath();
+      ctx.moveTo(toX(pts[0].time), toY(pts[0].price));
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(toX(pts[i].time), toY(pts[i].price));
+      ctx.lineTo(toX(pts[pts.length - 1].time), h - PAD.bottom);
+      ctx.lineTo(toX(pts[0].time), h - PAD.bottom);
+      ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
+
+      // Stroke
+      ctx.beginPath();
+      ctx.moveTo(toX(pts[0].time), toY(pts[0].price));
+      for (let i = 1; i < pts.length; i++) ctx.lineTo(toX(pts[i].time), toY(pts[i].price));
+      ctx.strokeStyle = clr; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+
+      /* Live dot */
+      if (isLive) {
+        const lp = pts[pts.length - 1];
+        const lx = toX(lp.time), ly = toY(lp.price);
+        const pulse = (Math.sin(NOW / 400) + 1) / 2;
+        ctx.beginPath(); ctx.arc(lx, ly, 6 + pulse * 6, 0, Math.PI * 2);
+        ctx.fillStyle = above ? "rgba(34,197,94,0.2)" : "rgba(239,68,68,0.2)"; ctx.fill();
+        ctx.beginPath(); ctx.arc(lx, ly, 4, 0, Math.PI * 2);
+        ctx.fillStyle = clr; ctx.fill();
+        ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+        ctx.fillStyle = clr; ctx.font = "bold 11px system-ui,sans-serif"; ctx.textAlign = "left";
+        ctx.fillText(fmtPrice(lp.price), lx + 10, ly + 4);
+      }
+
+      /* Resolved badge for past */
+      if (!isLive && !isFuture) {
+        const res = lastPrice >= baseline ? "YES" : "NO";
+        ctx.fillStyle = res === "YES" ? GREEN : RED;
+        ctx.font = "bold 14px system-ui,sans-serif"; ctx.textAlign = "center";
+        ctx.fillText(`Resolved: ${res}`, w / 2, PAD.top - 8);
+      }
+
+      /* Continue loop only for live */
+      if (isLive) rafRef.current = requestAnimationFrame(render);
+    };
+
+    rafRef.current = requestAnimationFrame(render);
+    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
+  }, [isLive, isFuture, windowStart, windowEnd, pastPoints, pastBaseline]);
+
+  /* Draw once for past data */
+  useEffect(() => {
+    if (!isLive && pastPoints.length > 0) {
+      // Trigger a single render by toggling a ref — the main effect handles it
+    }
+  }, [pastPoints, isLive]);
+
+  /* ── Derived values for header ── */
+  const baseline = isLive ? (isDaily ? data.dailyBaseline : data.hourlyBaseline) : pastBaseline;
   const currentPrice = isLive ? data.currentPrice : (pastPoints.length > 0 ? pastPoints[pastPoints.length - 1].price : 0);
   const isAbove = currentPrice >= baseline && baseline > 0;
   const priceDiff = baseline > 0 ? currentPrice - baseline : 0;
 
+  /* ── Loading / Future guards ── */
   if ((isLive && data.isLoading) || (!isLive && !isFuture && pastLoading)) {
     return (
       <div className="flex items-center justify-center h-full min-h-[300px]">
@@ -378,12 +352,8 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-4 pb-2">
         <div>
-          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            Price to beat
-          </span>
-          <div className="text-xl font-bold tabular-nums text-foreground">
-            ${formatPrice(baseline)}
-          </div>
+          <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Price to beat</span>
+          <div className="text-xl font-bold tabular-nums text-foreground">${formatPrice(baseline)}</div>
         </div>
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -402,11 +372,11 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
           <div className="text-right">
             <div className="flex items-baseline gap-1">
               <span className={cn("text-2xl font-bold tabular-nums", isAbove ? "text-emerald-500" : "text-red-500")}>
-                {String(countdown.mins).padStart(2, "0")}
+                {String(countdown.m).padStart(2, "0")}
               </span>
               <span className="text-[9px] font-semibold uppercase text-muted-foreground">Mins</span>
               <span className={cn("text-2xl font-bold tabular-nums", isAbove ? "text-emerald-500" : "text-red-500")}>
-                {String(countdown.secs).padStart(2, "0")}
+                {String(countdown.s).padStart(2, "0")}
               </span>
               <span className="text-[9px] font-semibold uppercase text-muted-foreground">Secs</span>
             </div>
