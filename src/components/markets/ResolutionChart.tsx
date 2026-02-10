@@ -25,7 +25,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
   const baseline = isDaily ? data.dailyBaseline : data.hourlyBaseline;
   const closeTime = isDaily ? data.dailyCloseTime : data.hourlyCloseTime;
 
-  // Compute window boundaries (fixed for the period)
+  // Window start is fixed for the period
   const windowStart = useMemo(() => {
     const now = new Date();
     if (isDaily) {
@@ -40,7 +40,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
 
   const windowEnd = closeTime.getTime();
 
-  // "now" cursor that ticks every second
+  // Tick every second — drives chart forward
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 1000);
@@ -54,15 +54,14 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
     return { mins: Math.floor(totalSecs / 60), secs: totalSecs % 60 };
   }, [windowEnd, now]);
 
-  // Build time-progressive chart data:
-  // Use candle data up to now, then extend a final point at `now` with currentPrice
+  // Build time-progressive data: x-axis ends at NOW, not at windowEnd
   const chartData = useMemo(() => {
     const source = isDaily ? data.dailyCandles : data.candles;
     const points = source
       .filter((c) => c.timestamp * 1000 >= windowStart && c.timestamp * 1000 <= now)
       .map((c) => ({ time: c.timestamp * 1000, price: c.close }));
 
-    // Extend to current time with latest price (makes line march forward)
+    // Always extend to current time with latest price (line marches forward even if flat)
     if (data.currentPrice > 0) {
       const lastTime = points.length > 0 ? points[points.length - 1].time : 0;
       if (now > lastTime) {
@@ -74,12 +73,12 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
   }, [data.candles, data.dailyCandles, data.currentPrice, isDaily, windowStart, now]);
 
   const currentPrice = data.currentPrice;
-  const isAbove = currentPrice >= baseline;
+  const isAbove = currentPrice >= baseline && baseline > 0;
   const priceDiff = baseline > 0 ? currentPrice - baseline : 0;
   const lineColor = isAbove ? "hsl(152, 69%, 53%)" : "hsl(0, 84%, 60%)";
   const gradientId = `res-grad-${asset}-${timeframe}`;
 
-  // Y-axis domain
+  // Y-axis: encompass baseline and all prices
   const yDomain = useMemo(() => {
     if (chartData.length === 0 && baseline <= 0) return [0, 100];
     const prices = chartData.map((d) => d.price);
@@ -113,7 +112,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Header: Price to beat | Current price | Countdown ── */}
+      {/* ── Header ── */}
       <div className="flex flex-wrap items-start justify-between gap-4 px-4 pt-4 pb-2">
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -127,9 +126,11 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
         <div>
           <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
             Current Price{" "}
-            <span className={cn("ml-1", isAbove ? "text-emerald-500" : "text-red-500")}>
-              {isAbove ? "▲" : "▼"} ${formatPrice(Math.abs(priceDiff))}
-            </span>
+            {baseline > 0 && (
+              <span className={cn("ml-1", isAbove ? "text-emerald-500" : "text-red-500")}>
+                {isAbove ? "▲" : "▼"} ${formatPrice(Math.abs(priceDiff))}
+              </span>
+            )}
           </span>
           <div className={cn("text-xl font-bold tabular-nums", isAbove ? "text-emerald-500" : "text-red-500")}>
             ${formatPrice(currentPrice)}
@@ -153,7 +154,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
         </div>
       </div>
 
-      {/* ── Resolution semantics ── */}
+      {/* ── Resolution indicators ── */}
       <div className="flex items-center gap-3 px-4 pb-2">
         <div className={cn(
           "flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full",
@@ -171,7 +172,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
         </div>
       </div>
 
-      {/* ── Time-progressive chart ── */}
+      {/* ── Time-progressive chart: x-axis grows to NOW ── */}
       <div className="flex-1 min-h-0 px-1 pb-2">
         {chartData.length < 2 ? (
           <div className="flex items-center justify-center h-full text-xs text-muted-foreground">
@@ -189,11 +190,11 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
 
               <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.4} />
 
-              {/* X-axis anchored to full market window */}
+              {/* X-axis: windowStart → now (NOT windowEnd) */}
               <XAxis
                 dataKey="time"
                 type="number"
-                domain={[windowStart, windowEnd]}
+                domain={[windowStart, now]}
                 tickFormatter={formatTime}
                 tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
                 tickLine={false}
@@ -221,7 +222,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
                 formatter={(value: number) => [`$${formatPrice(value)}`, "Price"]}
               />
 
-              {/* Baseline — "Price to beat" */}
+              {/* Baseline */}
               {baseline > 0 && (
                 <ReferenceLine
                   y={baseline}
@@ -238,35 +239,7 @@ export function ResolutionChart({ asset, timeframe }: ResolutionChartProps) {
                 />
               )}
 
-              {/* "Now" cursor — vertical line at current time */}
-              <ReferenceLine
-                x={now}
-                stroke="hsl(var(--muted-foreground))"
-                strokeDasharray="4 3"
-                strokeWidth={1}
-                label={{
-                  value: "now",
-                  position: "top",
-                  fill: "hsl(var(--muted-foreground))",
-                  fontSize: 9,
-                }}
-              />
-
-              {/* End boundary — resolution time */}
-              <ReferenceLine
-                x={windowEnd}
-                stroke="hsl(var(--destructive))"
-                strokeDasharray="6 3"
-                strokeWidth={1.5}
-                label={{
-                  value: isDaily ? "23:59 UTC" : formatTime(windowEnd),
-                  position: "top",
-                  fill: "hsl(var(--destructive))",
-                  fontSize: 9,
-                  fontWeight: 600,
-                }}
-              />
-
+              {/* Live price line */}
               <Area
                 type="monotone"
                 dataKey="price"
