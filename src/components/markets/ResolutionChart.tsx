@@ -40,7 +40,10 @@ function fmtPrice(p: number) {
 
 function fmtTime(ms: number) {
   const d = new Date(ms);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  const hh = String(d.getUTCHours()).padStart(2, "0");
+  const mm = String(d.getUTCMinutes()).padStart(2, "0");
+  const ss = String(d.getUTCSeconds()).padStart(2, "0");
+  return `${hh}:${mm}:${ss}`;
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -106,15 +109,11 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       if (price <= 0) return;
 
       const pts = pointsRef.current;
-      // Append new tick point — deduplicate within 1.5s
-      while (pts.length > 0 && pts[pts.length - 1].time > now - 1500) {
-        if (now - pts[pts.length - 1].time > 2000) break;
-        pts.pop();
-      }
+      // Simply append — one point per tick, no complex dedup
       pts.push({ time: now, price });
 
-      // Trim old points — only keep 35s buffer for rolling 30s window
-      const cutoff = now - 35_000;
+      // Trim old points — only keep 40s buffer for rolling 30s window
+      const cutoff = now - 40_000;
       while (pts.length > 0 && pts[0].time < cutoff) pts.shift();
 
       // Update countdown
@@ -125,7 +124,7 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
     tick();
     tickerRef.current = setInterval(tick, 1000);
     return () => { if (tickerRef.current) clearInterval(tickerRef.current); };
-  }, [isLive, windowEnd, isDaily]);
+  }, [isLive, windowEnd]);
 
   /* ═══ PAST: fetch historical candles for past period view ═══ */
   useEffect(() => {
@@ -245,13 +244,17 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
         ctx.fillText(fmtPrice(yVal), w - PAD.right + 4, y + 3);
       }
 
-      /* X labels */
-      const xTicks = Math.min(6, Math.floor(chartW / 90));
+      /* X labels (UTC) */
+      const xTicks = isLive ? 5 : Math.min(6, Math.floor(chartW / 90));
+      ctx.fillStyle = TEXT_CLR; ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center";
       for (let i = 0; i <= xTicks; i++) {
         const t = tMin + (i / xTicks) * tRange;
-        ctx.fillStyle = TEXT_CLR; ctx.font = "10px system-ui,sans-serif"; ctx.textAlign = "center";
         ctx.fillText(fmtTime(t), toX(t), h - 8);
       }
+      // UTC label
+      ctx.fillStyle = "rgba(148,163,184,0.5)"; ctx.font = "9px system-ui,sans-serif";
+      ctx.textAlign = "right";
+      ctx.fillText("UTC", w - PAD.right, h - 8);
 
       /* Baseline */
       const blY = toY(baseline);
@@ -266,22 +269,42 @@ export function ResolutionChart({ asset, timeframe, periodStart, periodEnd, peri
       const above = lastPrice >= baseline;
       const clr = above ? GREEN : RED;
 
-      // Fill
+      // Fill under curve
       const grad = ctx.createLinearGradient(0, PAD.top, 0, h - PAD.bottom);
-      grad.addColorStop(0, above ? "rgba(34,197,94,0.15)" : "rgba(239,68,68,0.15)");
+      grad.addColorStop(0, above ? "rgba(34,197,94,0.18)" : "rgba(239,68,68,0.18)");
       grad.addColorStop(1, "rgba(0,0,0,0)");
       ctx.beginPath();
       ctx.moveTo(toX(pts[0].time), toY(pts[0].price));
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(toX(pts[i].time), toY(pts[i].price));
+      for (let i = 1; i < pts.length; i++) {
+        // Smooth curve using quadratic bezier for each segment
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const cpx = (toX(prev.time) + toX(curr.time)) / 2;
+        ctx.quadraticCurveTo(toX(prev.time), toY(prev.price), cpx, (toY(prev.price) + toY(curr.price)) / 2);
+      }
+      // Final segment to last point
+      if (pts.length > 1) {
+        const last = pts[pts.length - 1];
+        ctx.lineTo(toX(last.time), toY(last.price));
+      }
       ctx.lineTo(toX(pts[pts.length - 1].time), h - PAD.bottom);
       ctx.lineTo(toX(pts[0].time), h - PAD.bottom);
       ctx.closePath(); ctx.fillStyle = grad; ctx.fill();
 
-      // Stroke
+      // Stroke — smooth line
       ctx.beginPath();
       ctx.moveTo(toX(pts[0].time), toY(pts[0].price));
-      for (let i = 1; i < pts.length; i++) ctx.lineTo(toX(pts[i].time), toY(pts[i].price));
-      ctx.strokeStyle = clr; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+      for (let i = 1; i < pts.length; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const cpx = (toX(prev.time) + toX(curr.time)) / 2;
+        ctx.quadraticCurveTo(toX(prev.time), toY(prev.price), cpx, (toY(prev.price) + toY(curr.price)) / 2);
+      }
+      if (pts.length > 1) {
+        const last = pts[pts.length - 1];
+        ctx.lineTo(toX(last.time), toY(last.price));
+      }
+      ctx.strokeStyle = clr; ctx.lineWidth = 2.5; ctx.lineJoin = "round"; ctx.lineCap = "round"; ctx.stroke();
 
       /* Live dot */
       if (isLive) {
