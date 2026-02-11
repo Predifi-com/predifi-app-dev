@@ -80,6 +80,7 @@ export function SEO({
   };
 
   const framePostUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/farcaster-frame`;
+  const dynamicFrameImage = `${framePostUrl}?render=image&t=${Math.floor(Date.now() / 60000)}`;
 
   return (
     <Helmet>
@@ -103,9 +104,9 @@ export function SEO({
       <meta property="twitter:description" content={description} />
       <meta property="twitter:image" content={ogImage} />
       
-      {/* Farcaster Frame */}
+      {/* Farcaster Frame - uses dynamic image with live market data */}
       <meta property="fc:frame" content="vNext" />
-      <meta property="fc:frame:image" content={ogImage} />
+      <meta property="fc:frame:image" content={dynamicFrameImage} />
       <meta property="fc:frame:post_url" content={framePostUrl} />
       <meta property="fc:frame:image:aspect_ratio" content="1.91:1" />
       <meta property="fc:frame:button:1" content={frameConfig.buttons[0].label} />
@@ -115,7 +116,6 @@ export function SEO({
       {frameConfig.buttons[1].target && (
         <meta property="fc:frame:button:2:target" content={frameConfig.buttons[1].target} />
       )}
-      
       {/* Telegram Mini App */}
       <meta name="telegram-web-app" content="true" />
       
