@@ -9,6 +9,51 @@ interface SEOProps {
   type?: string;
 }
 
+// Page-specific Farcaster Frame configurations
+function getFrameConfig(pathname: string) {
+  const baseUrl = "https://predifi.com";
+
+  if (pathname.startsWith("/markets") || pathname.startsWith("/market")) {
+    return {
+      buttons: [
+        { label: "Browse Markets", action: "post" },
+        { label: "Trade Now", action: "link", target: `${baseUrl}/markets` },
+      ],
+    };
+  }
+  if (pathname.startsWith("/arena")) {
+    return {
+      buttons: [
+        { label: "View Competitions", action: "post" },
+        { label: "Join Arena", action: "link", target: `${baseUrl}/arena` },
+      ],
+    };
+  }
+  if (pathname.startsWith("/wallet")) {
+    return {
+      buttons: [
+        { label: "Check Balance", action: "post" },
+        { label: "Open Wallet", action: "link", target: `${baseUrl}/wallet` },
+      ],
+    };
+  }
+  if (pathname.startsWith("/leaderboard")) {
+    return {
+      buttons: [
+        { label: "View Rankings", action: "post" },
+        { label: "Compete Now", action: "link", target: `${baseUrl}/arena` },
+      ],
+    };
+  }
+  // Default
+  return {
+    buttons: [
+      { label: "Explore Markets", action: "post" },
+      { label: "Join Predifi", action: "link", target: `${baseUrl}` },
+    ],
+  };
+}
+
 export function SEO({ 
   title = brand.seo.defaultTitle,
   description = brand.seo.defaultDescription,
@@ -17,6 +62,8 @@ export function SEO({
 }: SEOProps) {
   const location = useLocation();
   const url = `https://predifi.com${location.pathname}`;
+  const ogImage = `https://predifi.com${image}`;
+  const frameConfig = getFrameConfig(location.pathname);
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -32,13 +79,7 @@ export function SEO({
     }
   };
 
-  // Farcaster Frame configuration
-  const frameImage = image;
-  const framePostUrl = `${url}/api/frame`;
-  const frameButtons = [
-    { label: "View Markets", action: "post" },
-    { label: "Join Predifi", action: "link", target: url }
-  ];
+  const framePostUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/farcaster-frame`;
 
   return (
     <Helmet>
@@ -53,29 +94,30 @@ export function SEO({
       <meta property="og:url" content={url} />
       <meta property="og:title" content={title} />
       <meta property="og:description" content={description} />
-      <meta property="og:image" content={image} />
+      <meta property="og:image" content={ogImage} />
       
       {/* Twitter */}
       <meta property="twitter:card" content="summary_large_image" />
       <meta property="twitter:url" content={url} />
       <meta property="twitter:title" content={title} />
       <meta property="twitter:description" content={description} />
-      <meta property="twitter:image" content={image} />
+      <meta property="twitter:image" content={ogImage} />
       
       {/* Farcaster Frame */}
       <meta property="fc:frame" content="vNext" />
-      <meta property="fc:frame:image" content={frameImage} />
+      <meta property="fc:frame:image" content={ogImage} />
       <meta property="fc:frame:post_url" content={framePostUrl} />
       <meta property="fc:frame:image:aspect_ratio" content="1.91:1" />
-      <meta property="fc:frame:button:1" content="View Markets" />
-      <meta property="fc:frame:button:1:action" content="post" />
-      <meta property="fc:frame:button:2" content="Join Predifi" />
-      <meta property="fc:frame:button:2:action" content="link" />
-      <meta property="fc:frame:button:2:target" content={url} />
+      <meta property="fc:frame:button:1" content={frameConfig.buttons[0].label} />
+      <meta property="fc:frame:button:1:action" content={frameConfig.buttons[0].action} />
+      <meta property="fc:frame:button:2" content={frameConfig.buttons[1].label} />
+      <meta property="fc:frame:button:2:action" content={frameConfig.buttons[1].action} />
+      {frameConfig.buttons[1].target && (
+        <meta property="fc:frame:button:2:target" content={frameConfig.buttons[1].target} />
+      )}
       
       {/* Telegram Mini App */}
       <meta name="telegram-web-app" content="true" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
       
       {/* Structured Data */}
       <script type="application/ld+json">
