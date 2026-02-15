@@ -107,35 +107,35 @@ export function ExpandedPanel({
 
   return (
     <Dialog open={!!trader} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl bg-[#0e1118] border-white/20">
+      <DialogContent className="max-w-3xl bg-card border-border">
         <DialogHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className={cn(
                 'flex h-10 w-10 items-center justify-center rounded-full text-lg font-bold',
-                trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-white/10 text-white'
+                trader.currentRank <= 3 ? 'bg-warning/20 text-warning' : 'bg-muted text-foreground'
               )}>
                 #{trader.currentRank}
               </div>
               <div>
-                <DialogTitle className="text-2xl font-bold text-white">
+                <DialogTitle className="text-2xl font-bold text-foreground">
                   {trader.name}
                 </DialogTitle>
                 <div className="flex items-center gap-2 mt-1">
                   {trader.isLive && (
-                    <Badge variant="outline" className="border-green-500/50 bg-green-500/10 text-green-400">
-                      <div className="mr-1 h-2 w-2 animate-pulse rounded-full bg-green-400" />
+                    <Badge variant="outline" className="border-success/50 bg-success/10 text-success">
+                      <div className="mr-1 h-2 w-2 animate-pulse rounded-full bg-success" />
                       Live
                     </Badge>
                   )}
                   {trader.rankDelta > 0 && (
-                    <Badge variant="outline" className="border-green-500/50 text-green-400">
+                    <Badge variant="outline" className="border-success/50 text-success">
                       <TrendingUp className="mr-1 h-3 w-3" />
                       Up {trader.rankDelta}
                     </Badge>
                   )}
                   {trader.rankDelta < 0 && (
-                    <Badge variant="outline" className="border-red-500/50 text-red-400">
+                    <Badge variant="outline" className="border-destructive/50 text-destructive">
                       <TrendingDown className="mr-1 h-3 w-3" />
                       Down {Math.abs(trader.rankDelta)}
                     </Badge>

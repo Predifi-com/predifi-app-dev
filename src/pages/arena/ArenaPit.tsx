@@ -4,6 +4,8 @@
  */
 
 import { useEffect } from 'react'
+import Header from '@/components/Header'
+import Footer from '@/components/Footer'
 import { GlobalPriceBar } from '@/components/arena/pit/GlobalPriceBar'
 import { LeaderboardSidebar } from '@/components/arena/pit/LeaderboardSidebar'
 import { TraderPanel } from '@/components/arena/pit/TraderPanel'
@@ -65,10 +67,10 @@ export default function ArenaPit() {
   // Show loading state
   if (loading && traders.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0e1118]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-white/50" />
-          <p className="text-white/70">Loading Arena Pit...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading Arena Pit...</p>
         </div>
       </div>
     )
@@ -77,9 +79,9 @@ export default function ArenaPit() {
   // Show error state
   if (error && traders.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0e1118]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <p className="text-red-400">{error}</p>
+          <p className="text-destructive">{error}</p>
           <Button onClick={refresh} variant="outline">
             Retry
           </Button>
@@ -89,7 +91,8 @@ export default function ArenaPit() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0e1118]">
+    <div className="min-h-screen bg-background pb-20 md:pb-0">
+      <Header />
       {/* Global Price Bar */}
       {prices && epoch && (
         <GlobalPriceBar
@@ -114,18 +117,18 @@ export default function ArenaPit() {
         />
 
         {/* Main Content Area */}
-        <div className="ml-[280px] flex-1 p-6">
+        <div className="lg:ml-[280px] flex-1 p-4 lg:p-6">
           {/* Top Controls */}
           <div className="mb-6 flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-white">Arena Pit</h1>
+              <h1 className="text-2xl font-bold text-foreground">Arena Pit</h1>
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => ui.setDensityMode('compact')}
                   className={cn(
-                    ui.densityMode === 'compact' && 'bg-white/10'
+                    ui.densityMode === 'compact' && 'bg-muted'
                   )}
                 >
                   Compact
@@ -135,7 +138,7 @@ export default function ArenaPit() {
                   size="sm"
                   onClick={() => ui.setDensityMode('balanced')}
                   className={cn(
-                    ui.densityMode === 'balanced' && 'bg-white/10'
+                    ui.densityMode === 'balanced' && 'bg-muted'
                   )}
                 >
                   Balanced
@@ -145,7 +148,7 @@ export default function ArenaPit() {
                   size="sm"
                   onClick={() => ui.setDensityMode('detailed')}
                   className={cn(
-                    ui.densityMode === 'detailed' && 'bg-white/10'
+                    ui.densityMode === 'detailed' && 'bg-muted'
                   )}
                 >
                   Detailed
@@ -217,8 +220,8 @@ export default function ArenaPit() {
                     className={cn(
                       'flex h-8 w-8 items-center justify-center rounded text-sm font-medium transition-colors',
                       i === ui.currentPage
-                        ? 'bg-white/20 text-white'
-                        : 'text-white/50 hover:bg-white/10 hover:text-white'
+                        ? 'bg-muted text-foreground'
+                        : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
                     )}
                   >
                     {i + 1}
@@ -259,8 +262,8 @@ export default function ArenaPit() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm"
           onClick={() => ui.setShowShortcutsOverlay(false)}
         >
-          <div className="w-full max-w-md rounded-lg border border-white/20 bg-[#0e1118] p-6">
-            <h3 className="mb-4 text-lg font-semibold text-white">Keyboard Shortcuts</h3>
+          <div className="w-full max-w-md rounded-lg border border-border bg-card p-6">
+            <h3 className="mb-4 text-lg font-semibold text-foreground">Keyboard Shortcuts</h3>
             <div className="space-y-2">
               <ShortcutRow keys="Space" description="Pause/Resume auto-scroll" />
               <ShortcutRow keys="← →" description="Navigate pages" />
@@ -281,6 +284,8 @@ export default function ArenaPit() {
           </div>
         </div>
       )}
+
+      <Footer />
     </div>
   )
 }
@@ -288,10 +293,10 @@ export default function ArenaPit() {
 function ShortcutRow({ keys, description }: { keys: string; description: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <kbd className="rounded border border-white/20 bg-white/5 px-2 py-1 font-mono text-white">
+      <kbd className="rounded border border-border bg-muted px-2 py-1 font-mono text-foreground">
         {keys}
       </kbd>
-      <span className="text-white/70">{description}</span>
+      <span className="text-muted-foreground">{description}</span>
     </div>
   )
 }

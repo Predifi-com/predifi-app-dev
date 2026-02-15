@@ -113,7 +113,7 @@ export function GlobalPriceBar({
   }
 
   return (
-    <div className="sticky top-0 z-50 w-full border-b border-white/10 bg-[#0e1118] backdrop-blur-sm">
+    <div className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur-sm">
       <div className="flex h-[72px] items-center justify-between px-6">
         {/* Left: Live Prices */}
         <div className="flex items-center gap-8">
@@ -143,15 +143,15 @@ export function GlobalPriceBar({
 
         {/* Center: Epoch Timer */}
         <div className="flex flex-col items-center">
-          <div className="text-xs font-medium uppercase tracking-wider text-white/50">
+          <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
             {getEpochLabel()}
           </div>
           <div
             className={cn(
               'font-mono text-4xl font-bold tabular-nums',
               epochState === EpochState.ACTIVE && timeRemaining < 60000
-                ? 'text-red-400'
-                : 'text-white'
+                ? 'text-destructive'
+                : 'text-foreground'
             )}
           >
             {formatTime(timeRemaining)}
@@ -162,15 +162,15 @@ export function GlobalPriceBar({
         <div className="flex items-center gap-8">
           <StatDisplay label="ARENA PNL" value={formatPnl(totalPnl)} positive={totalPnl >= 0} />
           <div className="flex flex-col items-end">
-            <div className="text-xs font-medium uppercase tracking-wider text-white/50">VOLUME</div>
+            <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">VOLUME</div>
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xl font-semibold tabular-nums text-white">
+              <span className="font-mono text-xl font-semibold tabular-nums text-foreground">
                 {formatVolume(totalVolume)}
               </span>
               {totalBetVolume > 0 && (
                 <>
-                  <span className="text-white/30">|</span>
-                  <span className="font-mono text-sm font-semibold text-blue-400">
+                  <span className="text-muted-foreground/50">|</span>
+                  <span className="font-mono text-sm font-semibold text-primary">
                     {formatVolume(totalBetVolume)} Bet
                   </span>
                 </>
@@ -197,13 +197,13 @@ function PriceDisplay({ symbol, price, change24h, flash }: PriceDisplayProps) {
   return (
     <div className="flex flex-col">
       <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-white/70">{symbol}</span>
+        <span className="text-sm font-medium text-muted-foreground">{symbol}</span>
         <span
           className={cn(
             'font-mono text-xl font-semibold tabular-nums transition-colors duration-150',
-            flash === 'up' && 'text-green-400',
-            flash === 'down' && 'text-red-400',
-            !flash && 'text-white'
+            flash === 'up' && 'text-success',
+            flash === 'down' && 'text-destructive',
+            !flash && 'text-foreground'
           )}
         >
           ${price.toLocaleString()}
@@ -211,14 +211,14 @@ function PriceDisplay({ symbol, price, change24h, flash }: PriceDisplayProps) {
       </div>
       <div className="flex items-center gap-1">
         {isPositive ? (
-          <TrendingUp className="h-3 w-3 text-green-400" />
+          <TrendingUp className="h-3 w-3 text-success" />
         ) : (
-          <TrendingDown className="h-3 w-3 text-red-400" />
+          <TrendingDown className="h-3 w-3 text-destructive" />
         )}
         <span
           className={cn(
             'text-xs font-medium tabular-nums',
-            isPositive ? 'text-green-400' : 'text-red-400'
+            isPositive ? 'text-success' : 'text-destructive'
           )}
         >
           {isPositive ? '+' : ''}
@@ -239,13 +239,13 @@ interface StatDisplayProps {
 function StatDisplay({ label, value, positive }: StatDisplayProps) {
   return (
     <div className="flex flex-col items-end">
-      <div className="text-xs font-medium uppercase tracking-wider text-white/50">{label}</div>
+      <div className="text-xs font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
       <div
         className={cn(
           'font-mono text-xl font-semibold tabular-nums',
-          positive === true && 'text-green-400',
-          positive === false && 'text-red-400',
-          positive === undefined && 'text-white'
+          positive === true && 'text-success',
+          positive === false && 'text-destructive',
+          positive === undefined && 'text-foreground'
         )}
       >
         {value}
