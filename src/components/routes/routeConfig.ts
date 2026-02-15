@@ -36,6 +36,7 @@ const TraderProfile = lazy(() => import("@/pages/arena/TraderProfile"));
 const CompetitorHome = lazy(() => import("@/pages/arena/CompetitorHome"));
 const ArenaRegister = lazy(() => import("@/pages/arena/ArenaRegister"));
 const ArenaLearnMore = lazy(() => import("@/pages/arena/ArenaLearnMore"));
+const ArenaPit = lazy(() => import("@/pages/arena/ArenaPit"));
 const Wallet = lazy(() => import("@/pages/Wallet"));
 
 export type SkeletonType = "default" | "detail" | "table" | "dashboard";
@@ -106,6 +107,7 @@ export const arenaRoutes: RouteConfig[] = [
   { path: "/arena", component: ArenaOverview, transition: "page" },
   { path: "/arena/learn", component: ArenaLearnMore, transition: "page" },
   { path: "/arena/register", component: ArenaRegister, transition: "slide" },
+  { path: "/arena/pit", component: ArenaPit, skeleton: "detail", transition: "slide" },
   // Legacy route redirect
   { path: "/arena/compete", component: CompetitorHome, skeleton: "detail", transition: "slide", bypassGate: true },
   { path: "/arena/season/:id", component: SeasonDetail, skeleton: "detail", transition: "slide" },
