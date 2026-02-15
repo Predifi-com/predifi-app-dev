@@ -15,6 +15,8 @@ interface GlobalPriceBarProps {
   timeRemaining: number
   totalPnl: number
   totalVolume: number
+  totalTraders?: number
+  totalBetVolume?: number
 }
 
 export function GlobalPriceBar({
@@ -22,7 +24,9 @@ export function GlobalPriceBar({
   epochState,
   timeRemaining,
   totalPnl,
-  totalVolume
+  totalVolume,
+  totalTraders = 0,
+  totalBetVolume = 0
 }: GlobalPriceBarProps) {
   const [priceFlash, setPriceFlash] = useState<{
     BTC?: 'up' | 'down'
@@ -157,7 +161,22 @@ export function GlobalPriceBar({
         {/* Right: Aggregate Stats */}
         <div className="flex items-center gap-8">
           <StatDisplay label="ARENA PNL" value={formatPnl(totalPnl)} positive={totalPnl >= 0} />
-          <StatDisplay label="VOLUME" value={formatVolume(totalVolume)} />
+          <div className="flex flex-col items-end">
+            <div className="text-xs font-medium uppercase tracking-wider text-white/50">VOLUME</div>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xl font-semibold tabular-nums text-white">
+                {formatVolume(totalVolume)}
+              </span>
+              {totalBetVolume > 0 && (
+                <>
+                  <span className="text-white/30">|</span>
+                  <span className="font-mono text-sm font-semibold text-blue-400">
+                    {formatVolume(totalBetVolume)} Bet
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>

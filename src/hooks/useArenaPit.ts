@@ -29,12 +29,13 @@ import { toast } from 'sonner'
 /**
  * Main Arena Pit hook - manages all state and data fetching
  */
-export function useArenaPit() {
+export function useArenaPit(userAddress?: string) {
   const [traders, setTraders] = useState<TraderState[]>([])
   const [prices, setPrices] = useState<GlobalPrices | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastUpdate, setLastUpdate] = useState(Date.now())
+  const [totalBetVolume, setTotalBetVolume] = useState(0)
 
   const { epoch, timeRemaining, state: epochState } = useEpochState()
 
@@ -50,9 +51,18 @@ export function useArenaPit() {
 
       // Fetch both arena state and prices in parallel
       const [arenaData, globalPrices] = await Promise.all([
-        fetchArenaPitState(0),
+        fetchArenaPitState(0, userAddress),
         fetchGlobalPrices()
       ])
+
+      // Calculate total bet volume from market data
+      if (arenaData.marketData?.outcomes) {
+        const betVolume = arenaData.marketData.outcomes.reduce(
+          (sum: number, outcome: any) => sum + (outcome.volume || 0),
+          0
+        )
+        setTotalBetVolume(betVolume)
+      }
 
       // Initialize epoch if not already done
       if (!epoch) {
@@ -95,7 +105,7 @@ export function useArenaPit() {
     } finally {
       setLoading(false)
     }
-  }, [epoch])
+  }, [epoch, userAddress])
 
   /**
    * Update prices only (lighter than full data fetch)
@@ -180,6 +190,7 @@ export function useArenaPit() {
     timeRemaining,
     epochState,
     aggregateStats,
+    totalBetVolume,
     refresh
   }
 }

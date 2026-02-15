@@ -9,12 +9,16 @@ import { LeaderboardSidebar } from '@/components/arena/pit/LeaderboardSidebar'
 import { TraderPanel } from '@/components/arena/pit/TraderPanel'
 import { ExpandedPanel } from '@/components/arena/pit/ExpandedPanel'
 import { useArenaPit, useArenaPitUI, useArenaPitKeyboard } from '@/hooks/useArenaPit'
+import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Keyboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
 export default function ArenaPit() {
+  // Get user wallet
+  const { address: userAddress } = useWallet()
+
   // Core data
   const {
     traders,
@@ -26,8 +30,9 @@ export default function ArenaPit() {
     timeRemaining,
     epochState,
     aggregateStats,
+    totalBetVolume,
     refresh
-  } = useArenaPit()
+  } = useArenaPit(userAddress)
 
   // UI state
   const ui = useArenaPitUI(traders.length)
@@ -93,6 +98,8 @@ export default function ArenaPit() {
           timeRemaining={timeRemaining}
           totalPnl={aggregateStats.totalPnl}
           totalVolume={aggregateStats.totalVolume}
+          totalTraders={traders.length}
+          totalBetVolume={totalBetVolume}
         />
       )}
 
@@ -237,8 +244,12 @@ export default function ArenaPit() {
         <ExpandedPanel
           trader={expandedTrader}
           prices={prices}
+          epoch={epoch}
           onClose={() => ui.expandTrader(null)}
           onTradeClick={handlePairClick}
+          onTraderSwitch={(address) => ui.expandTrader(address)}
+          topContenders={traders.slice(0, 10)}
+          userBalance={1000} // TODO: Get from wallet context
         />
       )}
 

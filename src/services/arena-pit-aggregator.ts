@@ -343,15 +343,63 @@ export function calculateStateChecksum(traders: TraderState[]): string {
 }
 
 /**
- * Mock API call (to be replaced with real backend)
+ * Fetch arena pit state with optional market data
  */
-export async function fetchArenaPitState(page: number = 0): Promise<ArenaPitApiResponse> {
+export async function fetchArenaPitState(
+  page: number = 0,
+  userAddress?: string
+): Promise<ArenaPitApiResponse & { marketData?: any }> {
   try {
-    const response = await fetch(`/api/arena/pit/state?page=${page}`)
-    if (!response.ok) {
+    // Fetch arena state
+    const arenaResponse = await fetch(`/api/arena/pit/state?page=${page}`)
+    if (!arenaResponse.ok) {
       throw new Error('Failed to fetch arena pit state')
     }
-    return await response.json()
+    const arenaData = await arenaResponse.json()
+
+    // Fetch market data if we have an epochId
+    let marketData = null
+    if (arenaData.epochId) {
+      try {
+        const marketResponse = await fetch(
+          `/api/arena/markets/${arenaData.epochId}?user=${userAddress || ''}`
+        )
+        if (marketResponse.ok) {
+          marketData = await marketResponse.json()
+        }
+      } catch (error) {
+        console.warn('Failed to fetch market data:', error)
+        // Continue without market data
+      }
+    }
+
+    // Merge market data into trader data
+    if (marketData?.outcomes) {
+      arenaData.traders = arenaData.traders.map((trader: any) => {
+        const traderMarket = marketData.outcomes.find(
+          (o: any) => o.traderAddress === trader.address
+        )
+
+        return {
+          ...trader,
+          marketData: traderMarket
+            ? {
+                marketId: marketData.marketId,
+                outcomeIndex: traderMarket.index,
+                probability: traderMarket.probability,
+                yesPrice: traderMarket.yesPrice,
+                noPrice: traderMarket.noPrice,
+                volume: traderMarket.volume,
+                oddsChange: traderMarket.oddsChange,
+                userPosition: traderMarket.userPosition
+              }
+            : null,
+          historicalStats: traderMarket?.historicalStats || null
+        }
+      })
+    }
+
+    return { ...arenaData, marketData }
   } catch (error) {
     console.error('Failed to fetch arena pit state:', error)
 

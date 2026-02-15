@@ -91,6 +91,15 @@ export const TraderPanel = memo(function TraderPanel({
         aspectRatio: '16/9'
       }}
     >
+      {/* Odds Badge (if market data available) */}
+      {trader.marketData && (
+        <div className="absolute top-2 right-2 px-2 py-1 rounded-full bg-blue-500/20 border border-blue-400/30">
+          <span className="text-xs font-semibold text-blue-300">
+            {(trader.marketData.probability * 100).toFixed(0)}% odds
+          </span>
+        </div>
+      )}
+
       {/* Header */}
       <div className="mb-3 flex items-start justify-between">
         <div className="flex items-center gap-2">

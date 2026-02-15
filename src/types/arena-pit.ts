@@ -51,6 +51,37 @@ export interface TraderMarketExposure {
   SOL: TraderExposure
 }
 
+// ============================================================================
+// PREDICTION MARKET TYPES
+// ============================================================================
+
+export interface TraderHistoricalStats {
+  competitionsPlayed: number
+  wins: number
+  top3Finishes: number
+  winRate: number // percentage
+  avgRank: number
+  lifetimePnL: number
+}
+
+export interface TraderMarketData {
+  marketId: string          // Multi-outcome market ID
+  outcomeIndex: number       // This trader's outcome index (0-49)
+  probability: number        // 0.0 to 1.0 (e.g., 0.42 = 42%)
+  yesPrice: number          // Price to bet YES
+  noPrice: number           // Price to bet NO
+  volume: number            // Total bet on this outcome
+  oddsChange: number        // % change since epoch start
+
+  userPosition?: {
+    shares: number
+    side: 'YES' | 'NO'
+    avgPrice: number
+    currentValue: number
+    unrealizedPnL: number
+  }
+}
+
 export interface TraderState {
   address: string
   name: string
@@ -86,6 +117,10 @@ export interface TraderState {
   fundingPaid: number
   fundingReceived: number
   netFunding: number
+
+  // Historical & Market Data
+  historicalStats?: TraderHistoricalStats
+  marketData?: TraderMarketData
 }
 
 // ============================================================================
