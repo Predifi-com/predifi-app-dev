@@ -78,5 +78,6 @@ export interface WalletAPI {
   getDepositAddress(): Promise<DepositAddress>;
   deposit(amount: number): Promise<WalletTransaction>;
   withdraw(amount: number, address: string): Promise<WalletTransaction>;
+  deductTrade(amount: number): Promise<void>;
   getTransactions(limit?: number): Promise<WalletTransaction[]>;
 }

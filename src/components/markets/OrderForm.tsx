@@ -7,8 +7,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Wallet, TrendingUp, AlertCircle, ShieldAlert, Zap } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
-import { useBalance } from "@/hooks/useBalance";
 import { useWallet } from "@/hooks/useWallet";
+import { walletAPI } from "@/services/wallet-provider";
+import type { WalletBalance } from "@/types/wallet";
 import { toast } from "sonner";
 import { OrderConfirmModal } from "./OrderConfirmModal";
 import { StopLossTakeProfit } from "./StopLossTakeProfit";
@@ -37,9 +38,25 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const [fastOrder, setFastOrder] = useState(false);
   const [slTp, setSlTp] = useState({ stopLoss: "", takeProfit: "" });
   const [sessionTrades, setSessionTrades] = useState<TradeEntry[]>([]);
+  const [balance, setBalance] = useState<WalletBalance | null>(null);
 
-  const { balance } = useBalance();
   const { isConnected } = useWallet();
+
+  // Load balance from wallet API
+  const loadBalance = useCallback(async () => {
+    try {
+      const data = await walletAPI.getBalance();
+      setBalance(data);
+    } catch (err) {
+      console.error('Failed to load balance:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadBalance();
+    const interval = setInterval(loadBalance, 5000);
+    return () => clearInterval(interval);
+  }, [loadBalance]);
 
   // When a price is clicked in the order book, switch to limit and fill
   useEffect(() => {
@@ -74,7 +91,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
 
   const amountError = useMemo(() => {
     if (numAmount > 0 && numAmount < MIN_ORDER) return `Minimum order is $${MIN_ORDER}`;
-    if (balance && numAmount > (balance.available_balance ?? balance.total_balance ?? Infinity)) return "Insufficient balance";
+    if (balance && numAmount > balance.available) return "Insufficient balance";
     return null;
   }, [numAmount, balance]);
 
@@ -83,7 +100,17 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     onSideChange?.(s);
   };
 
-  const executeOrder = useCallback(() => {
+  const executeOrder = useCallback(async () => {
+    // Deduct the margin amount from wallet balance
+    const marginAmount = numAmount; // margin = entered amount, regardless of leverage
+    try {
+      await walletAPI.deductTrade(marginAmount);
+      await loadBalance(); // refresh balance after deduction
+    } catch (err: any) {
+      toast.error(err.message || 'Trade failed: insufficient balance');
+      return;
+    }
+
     const entry: TradeEntry = {
       id: crypto.randomUUID(),
       asset,
@@ -101,7 +128,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       ? ` · SL:${slTp.stopLoss || "—"} TP:${slTp.takeProfit || "—"}`
       : "";
     toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
-  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp]);
+  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp, loadBalance]);
 
   const handlePlaceOrder = () => {
     if (numAmount < MIN_ORDER) {
@@ -110,6 +137,10 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     }
     if (!isConnected) {
       toast.error("Connect your wallet to place orders");
+      return;
+    }
+    if (balance && numAmount > balance.available) {
+      toast.error(`Insufficient balance. Available: $${balance.available.toFixed(2)}`);
       return;
     }
     if (fastOrder) {
@@ -137,7 +168,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
         <span className="text-xs font-bold tabular-nums">
           {isConnected
             ? balance
-              ? `$${(balance.available_balance ?? balance.total_balance ?? 0).toFixed(2)}`
+              ? `$${balance.available.toFixed(2)}`
               : "Loading..."
             : "—"}
         </span>
