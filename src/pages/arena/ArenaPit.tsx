@@ -223,26 +223,35 @@ function ShortcutRow({ keys, description }: { keys: string; description: string 
 }
 
 // Inline leaderboard entry since we removed the external sidebar component dependency
-import { TraderState, PerformanceBadge, getPerformanceBadge, getPerformanceBand } from '@/types/arena-pit'
-import { TrendingUp, TrendingDown, AlertTriangle, Crown } from 'lucide-react'
+import { TraderState, getPerformanceBadge, getPerformanceBand } from '@/types/arena-pit'
+import { TrendingUp, TrendingDown } from 'lucide-react'
 import { TraderAvatar } from '@/components/arena/pit/TraderAvatar'
+import { MiniSparkline, generateSparkline } from '@/components/arena/pit/TraderPanel'
+
+/** Generate a deterministic win/loss streak from trader name */
+function getStreak(trader: TraderState): { type: 'W' | 'L'; count: number } {
+  let seed = 0
+  for (let i = 0; i < trader.name.length; i++) seed = ((seed << 5) - seed + trader.name.charCodeAt(i)) | 0
+  const rng = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff }
+  const isWinStreak = trader.totalPnl >= 0
+  const count = Math.floor(1 + rng() * (isWinStreak ? 5 : 3))
+  return { type: isWinStreak ? 'W' : 'L', count }
+}
 
 function LeaderboardEntry({ trader, isSelected, isHighlighted, onClick, totalTraders }: {
   trader: TraderState; isSelected: boolean; isHighlighted: boolean; onClick: () => void; totalTraders: number
 }) {
-  const badge = getPerformanceBadge(trader)
   const band = getPerformanceBand(trader.currentRank, totalTraders)
+  const streak = getStreak(trader)
+  const sparklineData = generateSparkline(trader.name, trader.totalPnl)
 
-  const formatPnl = (value: number) => {
-    const sign = value >= 0 ? '+' : ''
-    return `${sign}$${value.toFixed(2)}`
-  }
+  const formatPnl = (value: number) => `${value >= 0 ? '+' : ''}$${value.toFixed(2)}`
 
   return (
     <button
       onClick={onClick}
       className={cn(
-        'group relative w-full rounded-lg border p-2.5 text-left transition-all duration-200',
+        'group relative w-full rounded-lg border p-2 text-left transition-all duration-200',
         'hover:bg-accent/50',
         isSelected && 'border-primary/60 bg-primary/10',
         isHighlighted && 'animate-pulse border-yellow-500/60 bg-yellow-500/10',
@@ -250,26 +259,33 @@ function LeaderboardEntry({ trader, isSelected, isHighlighted, onClick, totalTra
         band === 'top' && !isSelected && !isHighlighted && 'border-green-500/20',
       )}
     >
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-1.5">
-          <TraderAvatar name={trader.name} size="md" />
-          <div className={cn(
-            'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
-            trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground'
-          )}>
-            {trader.currentRank <= 3 ? ['🥇','🥈','🥉'][trader.currentRank-1] : trader.currentRank}
-          </div>
-          <span className="text-xs font-medium text-foreground truncate max-w-[100px]">{trader.name}</span>
+      {/* Row 1: Avatar + Name + Rank */}
+      <div className="flex items-center gap-1.5 mb-1">
+        <TraderAvatar name={trader.name} size="sm" />
+        <div className={cn(
+          'flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold flex-shrink-0',
+          trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground'
+        )}>
+          {trader.currentRank <= 3 ? ['🥇','🥈','🥉'][trader.currentRank-1] : trader.currentRank}
         </div>
-        {trader.isLive && <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />}
+        <span className="text-[11px] font-medium text-foreground truncate flex-1">{trader.name}</span>
+        {trader.isLive && <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400 flex-shrink-0" />}
       </div>
+
+      {/* Row 2: PnL + Sparkline */}
       <div className="flex items-center justify-between">
-        <span className={cn('font-mono text-sm font-semibold tabular-nums', trader.totalPnl >= 0 ? 'text-green-400' : 'text-red-400')}>
-          {formatPnl(trader.totalPnl)}
-        </span>
-        <span className="text-[10px] text-muted-foreground">
-          ${trader.totalEquity.toFixed(2)}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={cn('font-mono text-xs font-bold tabular-nums', trader.totalPnl >= 0 ? 'text-green-400' : 'text-red-400')}>
+            {formatPnl(trader.totalPnl)}
+          </span>
+          <span className={cn(
+            'text-[9px] font-bold px-1 py-px rounded',
+            streak.type === 'W' ? 'bg-green-500/15 text-green-400' : 'bg-red-500/15 text-red-400'
+          )}>
+            {streak.count}{streak.type}
+          </span>
+        </div>
+        <MiniSparkline data={sparklineData} positive={trader.totalPnl >= 0} width={40} height={14} />
       </div>
     </button>
   )
