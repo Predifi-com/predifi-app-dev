@@ -48,14 +48,14 @@ export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogPr
       const rawBalance = await contract.balanceOf(DEPOSIT_ADDRESS);
       const usdcBalance = Number(ethers.formatUnits(rawBalance, 6));
 
-      toast.success(`USDC Balance on Optimism Sepolia: $${usdcBalance.toFixed(2)}`, { duration: 6000 });
+      toast.success(`USDC Balance on Optimism: $${usdcBalance.toFixed(2)}`, { duration: 6000 });
 
       // Set the wallet balance to the on-chain value
       if (usdcBalance > 0) {
         await walletAPI.deposit(usdcBalance);
         onSuccess();
       } else {
-        toast.info('No USDC found at this address on Optimism Sepolia.');
+        toast.info('No USDC found at this address on Optimism.');
       }
     } catch (error) {
       console.error('RPC balance fetch error:', error);
@@ -75,7 +75,7 @@ export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogPr
         <div className="space-y-5">
           <Alert>
             <AlertDescription>
-              Send USDC to the address below on <strong>Optimism Sepolia</strong> network
+              Send USDC to the address below on <strong>Optimism</strong> network
             </AlertDescription>
           </Alert>
 
@@ -97,7 +97,7 @@ export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogPr
 
           {/* Notes */}
           <div className="text-xs space-y-1 text-muted-foreground">
-            <p>⚠️ Only send USDC on Optimism Sepolia</p>
+            <p>⚠️ Only send USDC on Optimism</p>
             <p>⏱️ Deposits appear after confirmations (~30 seconds)</p>
             <p>💡 Minimum deposit: $1</p>
           </div>
