@@ -30,6 +30,10 @@ export const realWalletAPI: WalletAPI = {
     return res.json();
   },
 
+  async deductTrade(_amount: number): Promise<void> {
+    // In real mode, the backend handles trade deductions
+  },
+
   async getTransactions(limit = 20): Promise<WalletTransaction[]> {
     const res = await fetch(`${API_BASE}/api/wallet/transactions?limit=${limit}`, { credentials: 'include' });
     if (!res.ok) throw new Error('Failed to fetch transactions');

@@ -14,7 +14,8 @@ const initializeBalance = (): WalletBalance => {
     const parsed = JSON.parse(stored);
     return { ...parsed, lastUpdated: new Date(parsed.lastUpdated) };
   }
-  const initial: WalletBalance = { available: 1000, locked: 0, pending: 0, total: 1000, lastUpdated: new Date() };
+  // Start with 0 — will be set by Track Deposit from on-chain
+  const initial: WalletBalance = { available: 0, locked: 0, pending: 0, total: 0, lastUpdated: new Date() };
   localStorage.setItem(STORAGE_KEYS.BALANCE, JSON.stringify(initial));
   return initial;
 };
@@ -22,15 +23,7 @@ const initializeBalance = (): WalletBalance => {
 const initializeTransactions = (): WalletTransaction[] => {
   const stored = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
   if (stored) return JSON.parse(stored).map((t: any) => ({ ...t, timestamp: new Date(t.timestamp) }));
-  const initial: WalletTransaction[] = [{
-    id: 'tx-1',
-    type: 'deposit',
-    amount: 1000,
-    status: 'confirmed',
-    txHash: generateMockTxHash(),
-    timestamp: new Date(Date.now() - 86400000),
-    confirmations: 15,
-  }];
+  const initial: WalletTransaction[] = [];
   localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(initial));
   return initial;
 };
@@ -45,7 +38,7 @@ export const mockWalletAPI: WalletAPI = {
   },
 
   async getDepositAddress(): Promise<DepositAddress> {
-    return { address: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0', network: 'optimism', chainId: 10 };
+    return { address: '0x091822d60dEFD28Ce70e90956e5EfF26f97a91Da', network: 'optimism', chainId: 11155420 };
   },
 
   async deposit(amount: number) {
@@ -70,9 +63,12 @@ export const mockWalletAPI: WalletAPI = {
     transactions[0] = tx;
     saveTransactions(transactions);
 
+    // Set balance to the deposited amount (replace, not add — represents on-chain state)
     const balance = initializeBalance();
-    balance.available += amount;
-    balance.total += amount;
+    balance.available = amount;
+    balance.total = amount;
+    balance.locked = 0;
+    balance.pending = 0;
     balance.lastUpdated = new Date();
     saveBalance(balance);
 
@@ -119,6 +115,30 @@ export const mockWalletAPI: WalletAPI = {
     saveBalance(balance);
 
     return tx;
+  },
+
+  /** Deduct trade amount from available balance and lock it */
+  async deductTrade(amount: number): Promise<void> {
+    const balance = initializeBalance();
+    if (amount > balance.available) throw new Error('Insufficient balance');
+    balance.available -= amount;
+    balance.locked += amount;
+    balance.lastUpdated = new Date();
+    saveBalance(balance);
+
+    // Record as trade transaction
+    const tx: WalletTransaction = {
+      id: `tx-${Date.now()}`,
+      type: 'trade',
+      amount,
+      status: 'confirmed',
+      txHash: generateMockTxHash(),
+      timestamp: new Date(),
+      confirmations: 1,
+    };
+    const transactions = initializeTransactions();
+    transactions.unshift(tx);
+    saveTransactions(transactions);
   },
 
   async getTransactions(limit = 20) {
