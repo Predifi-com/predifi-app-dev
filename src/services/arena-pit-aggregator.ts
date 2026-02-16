@@ -344,6 +344,8 @@ export function calculateStateChecksum(traders: TraderState[]): string {
 
 /**
  * Generate mock traders for development
+ * Each trader starts with $100 and trades for up to 7 days.
+ * Position sizes, PnL, and volumes are realistic for a $100 starting balance.
  */
 function generateMockTraders(): ArenaPitApiResponse['traders'] {
   const names = [
@@ -355,36 +357,63 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
 
   return names.map((name, i) => {
     const addr = `0x${(i + 1).toString(16).padStart(40, '0')}`
-    const balance = 1000 + Math.random() * 9000
+
+    // Starting balance $100. PnL ranges from -$40 to +$60 (realistic for 7 days)
+    const pnlRange = (Math.random() - 0.4) * 100 // skews slightly negative
+    const pnl = Math.round(pnlRange * 100) / 100
+    const currentBalance = 100 + pnl
+    // How much is in positions vs unused
+    const positionRatio = 0.2 + Math.random() * 0.6 // 20-80% deployed
+    const unusedBalance = Math.max(5, currentBalance * (1 - positionRatio))
+
+    // BTC position: ~$20-50 notional at most (0.0002 - 0.0005 BTC at ~$100k)
+    const btcNotional = Math.random() > 0.4 ? (10 + Math.random() * 40) : 0
+    const btcPrice = 97500 + Math.random() * 5000
+    const btcSize = btcNotional / btcPrice // ~0.0001-0.0005
+
+    // ETH position: ~$15-40 notional (0.004 - 0.012 ETH at ~$3500)
+    const ethNotional = Math.random() > 0.3 ? (10 + Math.random() * 30) : 0
+    const ethPrice = 3400 + Math.random() * 400
+    const ethSize = ethNotional / ethPrice // ~0.003-0.01
+
+    // SOL position: ~$10-30 notional (0.05 - 0.15 SOL at ~$200)
+    const solNotional = Math.random() > 0.5 ? (5 + Math.random() * 25) : 0
+    const solPrice = 195 + Math.random() * 30
+    const solSize = solNotional / solPrice // ~0.03-0.13
+
+    // Direction: long or short (not both for simplicity)
+    const btcLong = Math.random() > 0.45
+    const ethLong = Math.random() > 0.4
+    const solLong = Math.random() > 0.5
 
     return {
       address: addr,
       name,
-      unusedBalance: balance,
+      unusedBalance: Math.round(unusedBalance * 100) / 100,
       exposure: {
         BTC: {
-          longSize: Math.random() > 0.5 ? Math.random() * 2 : 0,
-          shortSize: Math.random() > 0.6 ? Math.random() * 1.5 : 0,
-          avgLongEntry: 95000 + Math.random() * 10000,
-          avgShortEntry: 95000 + Math.random() * 10000
+          longSize: btcLong && btcSize > 0 ? Math.round(btcSize * 100000) / 100000 : 0,
+          shortSize: !btcLong && btcSize > 0 ? Math.round(btcSize * 100000) / 100000 : 0,
+          avgLongEntry: btcLong ? btcPrice * (1 - Math.random() * 0.03) : 0,
+          avgShortEntry: !btcLong ? btcPrice * (1 + Math.random() * 0.03) : 0
         },
         ETH: {
-          longSize: Math.random() > 0.4 ? Math.random() * 30 : 0,
-          shortSize: Math.random() > 0.7 ? Math.random() * 20 : 0,
-          avgLongEntry: 3200 + Math.random() * 600,
-          avgShortEntry: 3200 + Math.random() * 600
+          longSize: ethLong && ethSize > 0 ? Math.round(ethSize * 10000) / 10000 : 0,
+          shortSize: !ethLong && ethSize > 0 ? Math.round(ethSize * 10000) / 10000 : 0,
+          avgLongEntry: ethLong ? ethPrice * (1 - Math.random() * 0.04) : 0,
+          avgShortEntry: !ethLong ? ethPrice * (1 + Math.random() * 0.04) : 0
         },
         SOL: {
-          longSize: Math.random() > 0.5 ? Math.random() * 200 : 0,
-          shortSize: Math.random() > 0.6 ? Math.random() * 150 : 0,
-          avgLongEntry: 180 + Math.random() * 40,
-          avgShortEntry: 180 + Math.random() * 40
+          longSize: solLong && solSize > 0 ? Math.round(solSize * 10000) / 10000 : 0,
+          shortSize: !solLong && solSize > 0 ? Math.round(solSize * 10000) / 10000 : 0,
+          avgLongEntry: solLong ? solPrice * (1 - Math.random() * 0.05) : 0,
+          avgShortEntry: !solLong ? solPrice * (1 + Math.random() * 0.05) : 0
         }
       },
-      totalVolumeEpoch: Math.random() * 500000,
-      tradeCountEpoch: Math.floor(Math.random() * 50),
-      fundingPaid: Math.random() * 100,
-      fundingReceived: Math.random() * 80
+      totalVolumeEpoch: Math.round((200 + Math.random() * 800) * 100) / 100, // $200-$1000 cumulative volume
+      tradeCountEpoch: Math.floor(3 + Math.random() * 25), // 3-28 trades over 7 days
+      fundingPaid: Math.round(Math.random() * 2 * 100) / 100, // $0-$2
+      fundingReceived: Math.round(Math.random() * 1.5 * 100) / 100 // $0-$1.50
     }
   })
 }

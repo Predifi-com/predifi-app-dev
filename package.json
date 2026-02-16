@@ -90,6 +90,7 @@
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "three": "^0.160.1",
+    "usb": "npm:noop-package@^1.0.0",
     "vaul": "^0.9.9",
     "viem": "^2.38.6",
     "wagmi": "^2.19.2",
