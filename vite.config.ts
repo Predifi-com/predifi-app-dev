@@ -13,7 +13,6 @@ export default defineConfig(({ mode }) => ({
   },
   optimizeDeps: {
     esbuildOptions: {
-      // Enable esbuild polyfill plugins for Dynamic SDK
       plugins: [
         NodeGlobalsPolyfillPlugin({
           process: true,
@@ -21,6 +20,7 @@ export default defineConfig(({ mode }) => ({
         NodeModulesPolyfillPlugin() as any,
       ],
     },
+    exclude: ['usb'],
   },
   plugins: [
     react(),
@@ -29,6 +29,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "usb": path.resolve(__dirname, "./src/stubs/noop.js"),
     },
   },
 }));

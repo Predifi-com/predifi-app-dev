@@ -22,7 +22,7 @@ export function LeaderboardSidebar({
   onTraderClick
 }: LeaderboardSidebarProps) {
   return (
-    <div className="fixed left-0 top-[72px] h-[calc(100vh-72px)] w-[280px] border-r border-border bg-card">
+    <div className="fixed left-0 top-0 h-full w-[280px] border-r border-border bg-card z-40 pt-[160px]">
       <div className="flex h-12 items-center justify-between border-b border-border px-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
           Rankings
@@ -32,7 +32,7 @@ export function LeaderboardSidebar({
 
       <ScrollArea className="h-[calc(100%-48px)]">
         <div className="space-y-0.5 p-2">
-          {traders.map((trader) => (
+          {[...traders].sort((a, b) => a.currentRank - b.currentRank).map((trader) => (
             <LeaderboardEntry
               key={trader.address}
               trader={trader}
