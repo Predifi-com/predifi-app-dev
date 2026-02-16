@@ -39,13 +39,16 @@ interface DepositDialogProps {
 }
 
 export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogProps) {
-  const { address, chainId } = useWallet();
+  const { address, chainId, email } = useWallet();
   const [copied, setCopied] = useState(false);
   const [tracking, setTracking] = useState(false);
 
   const activeChainId = chainId && USDC_CONTRACTS[chainId] ? chainId : 10;
   const chainName = CHAIN_NAMES[activeChainId] || 'Optimism';
-  const depositAddress = address || '';
+
+  // Admin override: use specified deposit address for admin@predifi.com
+  const ADMIN_DEPOSIT_ADDRESS = '0x091822d60dEFD28Ce70e90956e5EfF26f97a91Da';
+  const depositAddress = email === 'admin@predifi.com' ? ADMIN_DEPOSIT_ADDRESS : (address || '');
 
   const copyAddress = () => {
     if (!depositAddress) return;
