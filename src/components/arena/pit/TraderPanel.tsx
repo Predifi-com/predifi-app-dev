@@ -7,6 +7,7 @@ import React, { memo } from 'react'
 import { TraderState, GlobalPrices, PairSymbol } from '@/types/arena-pit'
 import { cn } from '@/lib/utils'
 import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TraderAvatar } from './TraderAvatar'
 
 interface TraderPanelProps {
   trader: TraderState
@@ -54,10 +55,11 @@ export const TraderPanel = memo(function TraderPanel({
       {/* Header */}
       <div className="mb-1.5 flex items-center justify-between">
         <div className="flex items-center gap-1.5 min-w-0">
+          <TraderAvatar name={trader.name} size="sm" />
           <div className={cn(
-            'flex h-4.5 w-4.5 items-center justify-center rounded-full text-[9px] font-bold flex-shrink-0',
+            'flex h-4 w-4 items-center justify-center rounded-full text-[8px] font-bold flex-shrink-0',
             trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground'
-          )} style={{ width: 18, height: 18 }}>
+          )}>
             {trader.currentRank}
           </div>
           <h3 className="text-[11px] font-medium text-foreground truncate">{trader.name}</h3>

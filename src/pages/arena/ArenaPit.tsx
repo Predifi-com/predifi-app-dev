@@ -238,6 +238,7 @@ function ShortcutRow({ keys, description }: { keys: string; description: string 
 // Inline leaderboard entry since we removed the external sidebar component dependency
 import { TraderState, PerformanceBadge, getPerformanceBadge, getPerformanceBand } from '@/types/arena-pit'
 import { TrendingUp, TrendingDown, AlertTriangle, Crown } from 'lucide-react'
+import { TraderAvatar } from '@/components/arena/pit/TraderAvatar'
 
 function LeaderboardEntry({ trader, isSelected, isHighlighted, onClick, totalTraders }: {
   trader: TraderState; isSelected: boolean; isHighlighted: boolean; onClick: () => void; totalTraders: number
@@ -263,14 +264,15 @@ function LeaderboardEntry({ trader, isSelected, isHighlighted, onClick, totalTra
       )}
     >
       <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <TraderAvatar name={trader.name} size="md" />
           <div className={cn(
             'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
             trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground'
           )}>
             {trader.currentRank <= 3 ? ['🥇','🥈','🥉'][trader.currentRank-1] : trader.currentRank}
           </div>
-          <span className="text-xs font-medium text-foreground truncate max-w-[120px]">{trader.name}</span>
+          <span className="text-xs font-medium text-foreground truncate max-w-[100px]">{trader.name}</span>
         </div>
         {trader.isLive && <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />}
       </div>
