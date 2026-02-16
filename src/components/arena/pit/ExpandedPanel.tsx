@@ -56,18 +56,25 @@ function generateMockTradeHistory(trader: TraderState, prices: GlobalPrices): Tr
 
   const tradeCount = Math.max(3, trader.epochTradeCount)
 
+  // Fallback prices if live prices are 0
+  const safePrices: Record<PairSymbol, number> = {
+    BTC: prices.BTC.price > 0 ? prices.BTC.price : 99850,
+    ETH: prices.ETH.price > 0 ? prices.ETH.price : 3620,
+    SOL: prices.SOL.price > 0 ? prices.SOL.price : 212,
+  }
+
   for (let i = 0; i < tradeCount; i++) {
     const pair = pairs[Math.floor(rng() * 3)]
     const isLong = rng() > 0.45
-    const currentPrice = prices[pair].price
+    const currentPrice = safePrices[pair]
     const entryOffset = (rng() - 0.5) * 0.04
     const entryPrice = currentPrice * (1 + entryOffset)
     const isClosed = rng() > 0.3
     const exitOffset = (rng() - 0.45) * 0.03
     const exitPrice = isClosed ? currentPrice * (1 + exitOffset) : null
 
-    // Size in base units relative to $100 account
-    const notional = 5 + rng() * 30
+    // Notional $5-$30 relative to $100 account, then convert to base units
+    const notional = 5 + rng() * 25
     const size = notional / entryPrice
 
     let pnl = 0
@@ -86,7 +93,7 @@ function generateMockTradeHistory(trader: TraderState, prices: GlobalPrices): Tr
       timestamp: now - (tradeCount - i) * (3600000 + rng() * 7200000),
       pair,
       side: isLong ? 'Long' : 'Short',
-      size: Math.round(size * 100000) / 100000,
+      size: Math.round(size * 1e6) / 1e6,
       entryPrice: Math.round(entryPrice * 100) / 100,
       exitPrice: exitPrice ? Math.round(exitPrice * 100) / 100 : null,
       pnl: Math.round(pnl * 100) / 100,
@@ -142,7 +149,7 @@ export function ExpandedPanel({
 
   return (
     <Dialog open={!!trader} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 bg-card border-border overflow-hidden">
+      <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 bg-card border-border overflow-hidden [&>button]:z-10">
         {/* Fixed Header */}
         <DialogHeader className="p-5 pb-4 border-b border-border flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -166,7 +173,7 @@ export function ExpandedPanel({
         </DialogHeader>
 
         {/* Scrollable Content */}
-        <ScrollArea className="flex-1 min-h-0">
+        <div className="flex-1 overflow-y-auto min-h-0">
           <div className="p-5 space-y-5">
 
             {/* Quick Stats Row */}
@@ -337,7 +344,7 @@ export function ExpandedPanel({
               </div>
             )}
           </div>
-        </ScrollArea>
+        </div>
       </DialogContent>
     </Dialog>
   )
