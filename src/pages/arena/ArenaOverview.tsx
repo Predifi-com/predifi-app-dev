@@ -90,6 +90,15 @@ export default function ArenaOverview() {
             <Button
               variant="default"
               size="sm"
+              onClick={() => navigate("/arena/pit")}
+              className="text-xs bg-warning text-warning-foreground hover:bg-warning/90"
+            >
+              <Trophy className="w-3 h-3 mr-1" />
+              Enter The Pit
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
               onClick={() => setShowNotifyModal(true)}
               className="text-xs"
             >

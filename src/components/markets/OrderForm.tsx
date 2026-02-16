@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import { OrderConfirmModal } from "./OrderConfirmModal";
 import { StopLossTakeProfit } from "./StopLossTakeProfit";
 import { SessionTradeHistory, type TradeEntry } from "./SessionTradeHistory";
+import { useTradingStore } from "@/hooks/useTradingStore";
 
 const MIN_ORDER = 3;
 const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
@@ -41,6 +42,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   const [balance, setBalance] = useState<WalletBalance | null>(null);
 
   const { isConnected } = useWallet();
+  const { openPosition } = useTradingStore();
 
   // Load balance from wallet API
   const loadBalance = useCallback(async () => {
@@ -111,6 +113,25 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       return;
     }
 
+    const timeframe = isLeverage ? 'daily' : 'hourly';
+    const marketLabel = `${asset} ${timeframe.charAt(0).toUpperCase() + timeframe.slice(1)}`;
+    const sideUpper = side.toUpperCase() as 'YES' | 'NO';
+    const shares = effectivePrice > 0 ? effectiveAmount / (effectivePrice / 100) : 0;
+
+    // Open position in shared store (also creates notification)
+    openPosition({
+      id: crypto.randomUUID(),
+      asset,
+      timeframe,
+      market: marketLabel,
+      side: sideUpper,
+      size: numAmount,
+      shares,
+      entryPrice: effectivePrice,
+      leverage,
+      openedAt: Date.now(),
+    });
+
     const entry: TradeEntry = {
       id: crypto.randomUUID(),
       asset,
@@ -127,8 +148,8 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     const slTpLabel = leverage > 1 && (slTp.stopLoss || slTp.takeProfit)
       ? ` · SL:${slTp.stopLoss || "—"} TP:${slTp.takeProfit || "—"}`
       : "";
-    toast.success(`${orderType === "market" ? "Market" : "Limit"} order placed for ${effectiveAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
-  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp, loadBalance]);
+    toast.success(`${orderType === "market" ? "Market" : "Limit"} order filled: ${shares.toFixed(1)} ${sideUpper} shares at ${effectivePrice.toFixed(1)}¢ for $${numAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
+  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp, loadBalance, isLeverage, openPosition]);
 
   const handlePlaceOrder = () => {
     if (numAmount < MIN_ORDER) {

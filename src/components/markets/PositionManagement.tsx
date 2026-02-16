@@ -1,50 +1,75 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { X, ChevronDown } from "lucide-react";
+import { X } from "lucide-react";
+import { useTradingStore } from "@/hooks/useTradingStore";
+import { usePriceTicker } from "@/hooks/usePriceTicker";
+import { useMarketBaseline } from "@/hooks/useMarketBaseline";
+import { walletAPI } from "@/services/wallet-provider";
+import { toast } from "sonner";
 
-interface Position {
-  id: string;
-  market: string;
-  side: "YES" | "NO";
-  size: number;
-  entryPrice: number;
-  currentPrice: number;
-  pnl: number;
-  pnlPercent: number;
+/** Compute live YES probability from price vs baseline */
+function computeYesProb(currentPrice: number, baseline: number) {
+  if (baseline <= 0 || currentPrice <= 0) return 50;
+  return Math.min(95, Math.max(5, 50 + ((currentPrice - baseline) / baseline) * 100 * 25));
 }
 
-interface OrderEntry {
-  id: string;
-  market: string;
-  side: "BUY" | "SELL";
-  type: "MARKET" | "LIMIT";
-  price: number;
-  size: number;
-  filled: number;
-  status: "open" | "partial" | "filled" | "cancelled";
-  createdAt: string;
+function PositionRow({ position, onClose }: { position: any; onClose: () => void }) {
+  const { price: currentPrice } = usePriceTicker(position.asset);
+  const { baseline } = useMarketBaseline(position.asset, position.timeframe);
+
+  const currentYesProb = computeYesProb(currentPrice, baseline);
+  const currentCents = position.side === "YES" ? currentYesProb : (100 - currentYesProb);
+  const pnl = (currentCents - position.entryPrice) * position.shares / 100;
+  const pnlPercent = position.entryPrice > 0 ? ((currentCents - position.entryPrice) / position.entryPrice) * 100 : 0;
+
+  return (
+    <tr className="border-b border-border/50 hover:bg-muted/30 transition-colors">
+      <td className="p-2 pl-4 font-medium">{position.market}</td>
+      <td className="p-2">
+        <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", position.side === "YES" ? "text-emerald-500 border-emerald-500/30" : "text-red-500 border-red-500/30")}>
+          {position.side}
+        </Badge>
+      </td>
+      <td className="p-2 text-right tabular-nums">${position.size.toFixed(2)}</td>
+      <td className="p-2 text-right tabular-nums">{position.entryPrice.toFixed(1)}¢</td>
+      <td className="p-2 text-right tabular-nums">{currentCents.toFixed(1)}¢</td>
+      <td className={cn("p-2 text-right tabular-nums font-bold", pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+        {pnl >= 0 ? "+" : ""}{pnl.toFixed(2)}
+        <span className="text-muted-foreground font-normal ml-1">({pnlPercent.toFixed(1)}%)</span>
+      </td>
+      <td className="p-2 pr-4 text-right">
+        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive hover:text-destructive" onClick={onClose}>
+          <X className="w-3 h-3 mr-1" /> Close
+        </Button>
+      </td>
+    </tr>
+  );
 }
-
-// Demo data for trading demo
-const DEMO_POSITIONS: Position[] = [
-  { id: "p1", market: "BTC Hourly", side: "YES", size: 50, entryPrice: 0.52, currentPrice: 0.61, pnl: 4.5, pnlPercent: 17.3 },
-  { id: "p2", market: "ETH Daily", side: "NO", size: 25, entryPrice: 0.45, currentPrice: 0.38, pnl: 1.75, pnlPercent: 15.6 },
-  { id: "p3", market: "SOL Hourly", side: "YES", size: 40, entryPrice: 0.60, currentPrice: 0.54, pnl: -2.4, pnlPercent: -10.0 },
-  { id: "p4", market: "DOGE Daily", side: "NO", size: 15, entryPrice: 0.35, currentPrice: 0.42, pnl: -1.05, pnlPercent: -20.0 },
-];
-
-const DEMO_ORDERS: OrderEntry[] = [
-  { id: "o1", market: "SOL Hourly", side: "BUY", type: "LIMIT", price: 0.40, size: 30, filled: 0, status: "open", createdAt: "2 min ago" },
-  { id: "o2", market: "BTC Daily", side: "BUY", type: "MARKET", price: 0.55, size: 20, filled: 20, status: "filled", createdAt: "15 min ago" },
-];
 
 export function PositionManagement() {
   const [tab, setTab] = useState("positions");
+  const { positions, orders, closePosition } = useTradingStore();
 
-  const totalPnl = DEMO_POSITIONS.reduce((s, p) => s + p.pnl, 0);
+  const handleClose = async (posId: string) => {
+    const pos = positions.find((p) => p.id === posId);
+    if (pos) {
+      // Return margin to available balance
+      try {
+        // We'll add the margin back via deposit
+        await walletAPI.deposit(pos.size);
+      } catch (err) {
+        console.error("Failed to return margin:", err);
+      }
+    }
+    closePosition(posId);
+    toast.success("Position closed");
+  };
+
+  const openOrders = orders.filter((_, i) => false); // No open orders in demo — all are instantly filled
+  const filledOrders = orders;
 
   return (
     <div className="border-t border-border bg-card">
@@ -52,20 +77,15 @@ export function PositionManagement() {
         <div className="flex items-center justify-between px-4 pt-2">
           <TabsList className="h-8 bg-transparent p-0 gap-4">
             <TabsTrigger value="positions" className="text-xs h-7 px-0 pb-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-              Positions ({DEMO_POSITIONS.length})
+              Positions ({positions.length})
             </TabsTrigger>
             <TabsTrigger value="orders" className="text-xs h-7 px-0 pb-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-              Orders ({DEMO_ORDERS.filter(o => o.status === "open" || o.status === "partial").length})
+              Orders ({openOrders.length})
             </TabsTrigger>
             <TabsTrigger value="history" className="text-xs h-7 px-0 pb-2 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none">
-              History
+              History ({filledOrders.length})
             </TabsTrigger>
           </TabsList>
-          {totalPnl !== 0 && (
-            <span className={cn("text-xs font-bold tabular-nums", totalPnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-              PnL: {totalPnl >= 0 ? "+" : ""}{totalPnl.toFixed(2)} USDC
-            </span>
-          )}
         </div>
 
         <TabsContent value="positions" className="mt-0">
@@ -83,29 +103,10 @@ export function PositionManagement() {
                 </tr>
               </thead>
               <tbody>
-                {DEMO_POSITIONS.map((pos) => (
-                  <tr key={pos.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="p-2 pl-4 font-medium">{pos.market}</td>
-                    <td className="p-2">
-                      <Badge variant="outline" className={cn("text-[10px] px-1.5 py-0", pos.side === "YES" ? "text-emerald-500 border-emerald-500/30" : "text-red-500 border-red-500/30")}>
-                        {pos.side}
-                      </Badge>
-                    </td>
-                    <td className="p-2 text-right tabular-nums">{pos.size}</td>
-                    <td className="p-2 text-right tabular-nums">{(pos.entryPrice * 100).toFixed(0)}¢</td>
-                    <td className="p-2 text-right tabular-nums">{(pos.currentPrice * 100).toFixed(0)}¢</td>
-                    <td className={cn("p-2 text-right tabular-nums font-bold", pos.pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
-                      {pos.pnl >= 0 ? "+" : ""}{pos.pnl.toFixed(2)}
-                      <span className="text-muted-foreground font-normal ml-1">({pos.pnlPercent.toFixed(1)}%)</span>
-                    </td>
-                    <td className="p-2 pr-4 text-right">
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive hover:text-destructive">
-                        <X className="w-3 h-3 mr-1" /> Close
-                      </Button>
-                    </td>
-                  </tr>
+                {positions.map((pos) => (
+                  <PositionRow key={pos.id} position={pos} onClose={() => handleClose(pos.id)} />
                 ))}
-                {DEMO_POSITIONS.length === 0 && (
+                {positions.length === 0 && (
                   <tr><td colSpan={7} className="text-center p-6 text-muted-foreground">No open positions</td></tr>
                 )}
               </tbody>
@@ -123,38 +124,13 @@ export function PositionManagement() {
                   <th className="text-left p-2 font-medium">Side</th>
                   <th className="text-right p-2 font-medium">Price</th>
                   <th className="text-right p-2 font-medium">Size</th>
-                  <th className="text-right p-2 font-medium">Filled</th>
                   <th className="text-left p-2 font-medium">Status</th>
-                  <th className="text-right p-2 pr-4 font-medium">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {DEMO_ORDERS.map((order) => (
-                  <tr key={order.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
-                    <td className="p-2 pl-4 font-medium">{order.market}</td>
-                    <td className="p-2">
-                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">{order.type}</Badge>
-                    </td>
-                    <td className="p-2">
-                      <span className={cn("font-medium", order.side === "BUY" ? "text-emerald-500" : "text-red-500")}>{order.side}</span>
-                    </td>
-                    <td className="p-2 text-right tabular-nums">{(order.price * 100).toFixed(0)}¢</td>
-                    <td className="p-2 text-right tabular-nums">{order.size}</td>
-                    <td className="p-2 text-right tabular-nums">{order.filled}/{order.size}</td>
-                    <td className="p-2">
-                      <Badge variant={order.status === "open" ? "default" : order.status === "filled" ? "secondary" : "outline"} className="text-[10px] px-1.5 py-0">
-                        {order.status}
-                      </Badge>
-                    </td>
-                    <td className="p-2 pr-4 text-right">
-                      {(order.status === "open" || order.status === "partial") && (
-                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive hover:text-destructive">
-                          Cancel
-                        </Button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {openOrders.length === 0 && (
+                  <tr><td colSpan={6} className="text-center p-6 text-muted-foreground">No open orders</td></tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -170,24 +146,26 @@ export function PositionManagement() {
                   <th className="text-left p-2 font-medium">Side</th>
                   <th className="text-right p-2 font-medium">Price</th>
                   <th className="text-right p-2 font-medium">Size</th>
+                  <th className="text-right p-2 font-medium">Shares</th>
                   <th className="text-left p-2 font-medium">Status</th>
                   <th className="text-right p-2 pr-4 font-medium">Time</th>
                 </tr>
               </thead>
               <tbody>
-                {DEMO_ORDERS.filter(o => o.status === "filled" || o.status === "cancelled").map((order) => (
+                {filledOrders.map((order) => (
                   <tr key={order.id} className="border-b border-border/50 hover:bg-muted/30 transition-colors">
                     <td className="p-2 pl-4 font-medium">{order.market}</td>
                     <td className="p-2"><Badge variant="outline" className="text-[10px] px-1.5 py-0">{order.type}</Badge></td>
-                    <td className="p-2"><span className={cn("font-medium", order.side === "BUY" ? "text-emerald-500" : "text-red-500")}>{order.side}</span></td>
-                    <td className="p-2 text-right tabular-nums">{(order.price * 100).toFixed(0)}¢</td>
-                    <td className="p-2 text-right tabular-nums">{order.size}</td>
-                    <td className="p-2"><Badge variant="secondary" className="text-[10px] px-1.5 py-0">{order.status}</Badge></td>
-                    <td className="p-2 pr-4 text-right text-muted-foreground">{order.createdAt}</td>
+                    <td className="p-2"><span className="font-medium text-emerald-500">{order.side}</span></td>
+                    <td className="p-2 text-right tabular-nums">{order.price.toFixed(1)}¢</td>
+                    <td className="p-2 text-right tabular-nums">${order.size.toFixed(2)}</td>
+                    <td className="p-2 text-right tabular-nums">{order.shares.toFixed(1)}</td>
+                    <td className="p-2"><Badge variant="secondary" className="text-[10px] px-1.5 py-0">filled</Badge></td>
+                    <td className="p-2 pr-4 text-right text-muted-foreground">{new Date(order.filledAt).toLocaleTimeString()}</td>
                   </tr>
                 ))}
-                {DEMO_ORDERS.filter(o => o.status === "filled" || o.status === "cancelled").length === 0 && (
-                  <tr><td colSpan={7} className="text-center p-6 text-muted-foreground">No order history</td></tr>
+                {filledOrders.length === 0 && (
+                  <tr><td colSpan={8} className="text-center p-6 text-muted-foreground">No order history</td></tr>
                 )}
               </tbody>
             </table>
