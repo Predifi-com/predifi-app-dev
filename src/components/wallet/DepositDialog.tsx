@@ -10,9 +10,9 @@ import { walletAPI } from '@/services/wallet-provider';
 import { toast } from 'sonner';
 import { ethers } from 'ethers';
 
-// Optimism mainnet config
-const OP_RPC = 'https://mainnet.optimism.io';
-const OP_USDC = '0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85';
+// Optimism Sepolia testnet (hidden from UI)
+const OP_RPC = 'https://sepolia.optimism.io';
+const OP_USDC = '0x5fd84259d66Cd46123540766Be93DFE6D43130D7';
 const DEPOSIT_ADDRESS = '0x091822d60dEFD28Ce70e90956e5EfF26f97a91Da';
 
 const ERC20_BALANCE_ABI = ['function balanceOf(address) view returns (uint256)'];
