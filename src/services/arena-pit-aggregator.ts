@@ -343,6 +343,64 @@ export function calculateStateChecksum(traders: TraderState[]): string {
 }
 
 /**
+ * Generate mock traders for development
+ */
+function generateMockTraders(): ArenaPitApiResponse['traders'] {
+  const names = [
+    'CryptoWhale', 'DeFi_Degen', 'AlphaHunter', 'LiquidityKing',
+    'MarketMaker_X', 'Satoshi_Fan', 'ETH_Maxi', 'SOL_Surfer',
+    'LeverageLord', 'DeltaNeutral', 'GigaBrain', 'ApeInto',
+    'YieldFarmer', 'MEV_Bot_42', 'OnChainSage', 'PerpTrader99'
+  ]
+
+  return names.map((name, i) => {
+    const addr = `0x${(i + 1).toString(16).padStart(40, '0')}`
+    const balance = 1000 + Math.random() * 9000
+
+    return {
+      address: addr,
+      name,
+      unusedBalance: balance,
+      exposure: {
+        BTC: {
+          longSize: Math.random() > 0.5 ? Math.random() * 2 : 0,
+          shortSize: Math.random() > 0.6 ? Math.random() * 1.5 : 0,
+          avgLongEntry: 95000 + Math.random() * 10000,
+          avgShortEntry: 95000 + Math.random() * 10000
+        },
+        ETH: {
+          longSize: Math.random() > 0.4 ? Math.random() * 30 : 0,
+          shortSize: Math.random() > 0.7 ? Math.random() * 20 : 0,
+          avgLongEntry: 3200 + Math.random() * 600,
+          avgShortEntry: 3200 + Math.random() * 600
+        },
+        SOL: {
+          longSize: Math.random() > 0.5 ? Math.random() * 200 : 0,
+          shortSize: Math.random() > 0.6 ? Math.random() * 150 : 0,
+          avgLongEntry: 180 + Math.random() * 40,
+          avgShortEntry: 180 + Math.random() * 40
+        }
+      },
+      totalVolumeEpoch: Math.random() * 500000,
+      tradeCountEpoch: Math.floor(Math.random() * 50),
+      fundingPaid: Math.random() * 100,
+      fundingReceived: Math.random() * 80
+    }
+  })
+}
+
+/**
+ * Generate mock global prices
+ */
+function generateMockPrices(): GlobalPrices {
+  return {
+    BTC: { symbol: 'BTC', price: 97500 + Math.random() * 5000, change24h: 1200, change24hPercentage: 1.25, lastUpdate: Date.now() },
+    ETH: { symbol: 'ETH', price: 3400 + Math.random() * 400, change24h: 85, change24hPercentage: 2.5, lastUpdate: Date.now() },
+    SOL: { symbol: 'SOL', price: 195 + Math.random() * 30, change24h: 8, change24hPercentage: 4.1, lastUpdate: Date.now() }
+  }
+}
+
+/**
  * Fetch arena pit state with optional market data
  */
 export async function fetchArenaPitState(
@@ -369,7 +427,6 @@ export async function fetchArenaPitState(
         }
       } catch (error) {
         console.warn('Failed to fetch market data:', error)
-        // Continue without market data
       }
     }
 
@@ -379,7 +436,6 @@ export async function fetchArenaPitState(
         const traderMarket = marketData.outcomes.find(
           (o: any) => o.traderAddress === trader.address
         )
-
         return {
           ...trader,
           marketData: traderMarket
@@ -401,20 +457,36 @@ export async function fetchArenaPitState(
 
     return { ...arenaData, marketData }
   } catch (error) {
-    console.error('Failed to fetch arena pit state:', error)
+    console.warn('API unavailable, using mock data:', error)
 
     // Return mock data for development
     return {
-      traders: [],
-      totalCount: 0,
+      traders: generateMockTraders(),
+      totalCount: 16,
       epochEndTimestamp: Date.now() + 4 * 60 * 60 * 1000,
       epochStartTimestamp: Date.now() - 30 * 60 * 1000,
-      epochId: 'epoch-1',
+      epochId: 'mock-epoch-1',
       serverTimestamp: Date.now(),
-      checksum: '',
+      checksum: 'mock',
       version: '1.0.0',
       dataSourceLatency: 0,
       cacheHit: false
     }
+  }
+}
+
+/**
+ * Fetch current global prices from GMX, with mock fallback
+ */
+export async function fetchGlobalPricesSafe(): Promise<GlobalPrices> {
+  try {
+    const prices = await fetchGlobalPrices()
+    // If all prices are 0, use mock
+    if (prices.BTC.price === 0 && prices.ETH.price === 0 && prices.SOL.price === 0) {
+      return generateMockPrices()
+    }
+    return prices
+  } catch {
+    return generateMockPrices()
   }
 }

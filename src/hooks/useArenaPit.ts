@@ -15,7 +15,7 @@ import {
 } from '@/types/arena-pit'
 import {
   fetchArenaPitState,
-  fetchGlobalPrices,
+  fetchGlobalPricesSafe,
   transformApiResponseToTraderState,
   updateTraderRankings,
   calculateAggregateStats,
@@ -52,7 +52,7 @@ export function useArenaPit(userAddress?: string) {
       // Fetch both arena state and prices in parallel
       const [arenaData, globalPrices] = await Promise.all([
         fetchArenaPitState(0, userAddress),
-        fetchGlobalPrices()
+        fetchGlobalPricesSafe()
       ])
 
       // Calculate total bet volume from market data
@@ -112,7 +112,7 @@ export function useArenaPit(userAddress?: string) {
    */
   const updatePrices = useCallback(async () => {
     try {
-      const globalPrices = await fetchGlobalPrices()
+      const globalPrices = await fetchGlobalPricesSafe()
 
       // Recalculate PnL for all traders with new prices
       setTraders((prevTraders) =>
