@@ -1,9 +1,9 @@
 /**
  * Arena Pit Page
- * High-performance live trading competition interface
+ * Live trading competition interface with 50 traders, 12 per page
  */
 
-import { useEffect } from 'react'
+import { useMemo } from 'react'
 import { GlobalPriceBar } from '@/components/arena/pit/GlobalPriceBar'
 import { LeaderboardSidebar } from '@/components/arena/pit/LeaderboardSidebar'
 import { TraderPanel } from '@/components/arena/pit/TraderPanel'
@@ -13,21 +13,19 @@ import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Keyboard } from 'lucide-react'
 import Header from '@/components/Header'
-import { DensityMode } from '@/types/arena-pit'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
+const PANELS_PER_PAGE = 12
+
 export default function ArenaPit() {
-  // Get user wallet
   const { address: userAddress } = useWallet()
 
-  // Core data
   const {
     traders,
     prices,
     loading,
     error,
-    lastUpdate,
     epoch,
     timeRemaining,
     epochState,
@@ -36,65 +34,48 @@ export default function ArenaPit() {
     refresh
   } = useArenaPit(userAddress)
 
-  // UI state
   const ui = useArenaPitUI(traders.length)
-
-  // Keyboard shortcuts
   useArenaPitKeyboard(ui)
 
-  // Get visible traders for current page
-  const visibleTraders = ui.getVisibleTraders(traders)
+  const totalPages = Math.ceil(traders.length / PANELS_PER_PAGE)
+  const visibleTraders = useMemo(() => {
+    const start = ui.currentPage * PANELS_PER_PAGE
+    return traders.slice(start, start + PANELS_PER_PAGE)
+  }, [traders, ui.currentPage])
 
-  // Handle trader panel click
-  const handleTraderClick = (address: string) => {
-    ui.expandTrader(address)
-  }
+  const handleTraderClick = (address: string) => ui.expandTrader(address)
+  const handleLeaderboardClick = (address: string, rank: number) => ui.jumpToTrader(address, rank)
+  const handlePairClick = (pair: string) => toast.info(`Open trading modal for ${pair}`)
 
-  // Handle leaderboard click
-  const handleLeaderboardClick = (address: string, rank: number) => {
-    ui.jumpToTrader(address, rank)
-  }
-
-  // Handle pair click (open trading modal - would integrate with existing trading modal)
-  const handlePairClick = (pair: string) => {
-    toast.info(`Open trading modal for ${pair}`)
-    // TODO: Integrate with existing TradingModal
-  }
-
-  // Find expanded trader
   const expandedTrader = traders.find((t) => t.address === ui.expandedTrader) || null
 
-  // Show loading state
   if (loading && traders.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-12 w-12 animate-spin text-white/50" />
-          <p className="text-white/70">Loading Arena Pit...</p>
+          <Loader2 className="h-12 w-12 animate-spin text-muted-foreground" />
+          <p className="text-muted-foreground">Loading Arena Pit...</p>
         </div>
       </div>
     )
   }
 
-  // Show error state
   if (error && traders.length === 0) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <p className="text-destructive">{error}</p>
-          <Button onClick={refresh} variant="outline">
-            Retry
-          </Button>
+          <Button onClick={refresh} variant="outline">Retry</Button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Header />
-      {/* Global Price Bar */}
-      {prices && epoch && (
+
+      {prices && (
         <GlobalPriceBar
           prices={prices}
           epochState={epochState}
@@ -106,94 +87,58 @@ export default function ArenaPit() {
         />
       )}
 
-      {/* Main Container */}
-      <div className="flex">
+      {/* Main area: sidebar + grid */}
+      <div className="flex flex-1 overflow-hidden">
         {/* Leaderboard Sidebar */}
-        <LeaderboardSidebar
-          traders={traders}
-          selectedTrader={ui.selectedTrader}
-          highlightedTrader={ui.highlightedTrader}
-          onTraderClick={handleLeaderboardClick}
-        />
-
-        {/* Main Content Area */}
-        <div className="ml-[280px] flex-1 p-6">
-          {/* Top Controls */}
-          <div className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-foreground">Arena Pit</h1>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => ui.setDensityMode(DensityMode.COMPACT)}
-                  className={cn(
-                    ui.densityMode === DensityMode.COMPACT && 'bg-white/10'
-                  )}
-                >
-                  Compact
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => ui.setDensityMode(DensityMode.BALANCED)}
-                  className={cn(
-                    ui.densityMode === DensityMode.BALANCED && 'bg-white/10'
-                  )}
-                >
-                  Balanced
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => ui.setDensityMode(DensityMode.DETAILED)}
-                  className={cn(
-                    ui.densityMode === DensityMode.DETAILED && 'bg-white/10'
-                  )}
-                >
-                  Detailed
-                </Button>
-              </div>
+        <div className="w-[280px] flex-shrink-0 border-r border-border bg-card overflow-hidden flex flex-col">
+          <div className="flex h-10 items-center justify-between border-b border-border px-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Rankings</h2>
+            <span className="text-yellow-400 text-sm">🏆</span>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <div className="space-y-0.5 p-2">
+              {[...traders].sort((a, b) => a.currentRank - b.currentRank).map((trader) => (
+                <LeaderboardEntry
+                  key={trader.address}
+                  trader={trader}
+                  isSelected={trader.address === ui.selectedTrader}
+                  isHighlighted={trader.address === ui.highlightedTrader}
+                  onClick={() => handleLeaderboardClick(trader.address, trader.currentRank)}
+                  totalTraders={traders.length}
+                />
+              ))}
             </div>
+          </div>
+        </div>
 
+        {/* Main Content */}
+        <div className="flex flex-1 flex-col overflow-hidden p-3">
+          {/* Top Controls */}
+          <div className="mb-2 flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-3">
+              <h1 className="text-lg font-bold text-foreground">Arena Pit</h1>
+              <span className="text-xs text-muted-foreground">
+                {traders.length} traders • Page {ui.currentPage + 1}/{totalPages}
+              </span>
+            </div>
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => ui.setAutoScrollEnabled(!ui.autoScrollEnabled)}
-              >
-                {ui.autoScrollEnabled ? 'Pause Auto-Scroll' : 'Enable Auto-Scroll'}
-              </Button>
               <Button variant="outline" size="sm" onClick={refresh}>
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-3.5 w-3.5" />
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => ui.setShowShortcutsOverlay(true)}
-              >
-                <Keyboard className="h-4 w-4" />
+              <Button variant="outline" size="sm" onClick={() => ui.setShowShortcutsOverlay(true)}>
+                <Keyboard className="h-3.5 w-3.5" />
               </Button>
             </div>
           </div>
 
-          {/* Trader Grid */}
-          <div
-            className={cn(
-              'grid gap-4',
-              ui.densityMode === 'detailed'
-                ? 'grid-cols-3'
-                : 'grid-cols-4'
-            )}
-          >
-            {visibleTraders.map((trader, index) => (
+          {/* Trader Grid - 4 columns, 3 rows, fills remaining space */}
+          <div className="grid flex-1 grid-cols-4 grid-rows-3 gap-2 min-h-0">
+            {visibleTraders.map((trader) => (
               <TraderPanel
                 key={trader.address}
                 trader={trader}
-                densityMode={ui.densityMode}
                 prices={prices!}
                 isHighlighted={trader.address === ui.highlightedTrader}
-                isTop3={trader.currentRank <= 3}
                 onClick={() => handleTraderClick(trader.address)}
                 onPairClick={handlePairClick}
               />
@@ -201,26 +146,26 @@ export default function ArenaPit() {
           </div>
 
           {/* Pagination */}
-          {ui.totalPages > 1 && (
-            <div className="mt-8 flex items-center justify-center gap-4">
+          {totalPages > 1 && (
+            <div className="mt-2 flex items-center justify-center gap-3 flex-shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={ui.previousPage}
+                onClick={() => ui.goToPage(ui.currentPage - 1)}
                 disabled={ui.currentPage === 0}
               >
                 <ChevronLeft className="h-4 w-4" />
               </Button>
 
-              <div className="flex items-center gap-2">
-                {Array.from({ length: ui.totalPages }, (_, i) => (
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => (
                   <button
                     key={i}
                     onClick={() => ui.goToPage(i)}
                     className={cn(
-                      'flex h-8 w-8 items-center justify-center rounded text-sm font-medium transition-colors',
+                      'flex h-6 w-6 items-center justify-center rounded text-xs font-medium transition-colors',
                       i === ui.currentPage
-                        ? 'bg-muted text-foreground'
+                        ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-muted hover:text-foreground'
                     )}
                   >
@@ -232,8 +177,8 @@ export default function ArenaPit() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={ui.nextPage}
-                disabled={ui.currentPage === ui.totalPages - 1}
+                onClick={() => ui.goToPage(ui.currentPage + 1)}
+                disabled={ui.currentPage === totalPages - 1}
               >
                 <ChevronRight className="h-4 w-4" />
               </Button>
@@ -252,7 +197,7 @@ export default function ArenaPit() {
           onTradeClick={handlePairClick}
           onTraderSwitch={(address) => ui.expandTrader(address)}
           topContenders={traders.slice(0, 10)}
-          userBalance={1000} // TODO: Get from wallet context
+          userBalance={100}
         />
       )}
 
@@ -265,20 +210,13 @@ export default function ArenaPit() {
           <div className="w-full max-w-md rounded-lg border border-border bg-card p-6">
             <h3 className="mb-4 text-lg font-semibold text-foreground">Keyboard Shortcuts</h3>
             <div className="space-y-2">
-              <ShortcutRow keys="Space" description="Pause/Resume auto-scroll" />
               <ShortcutRow keys="← →" description="Navigate pages" />
               <ShortcutRow keys="1-9" description="Jump to rank" />
-              <ShortcutRow keys="D" description="Toggle density mode" />
               <ShortcutRow keys="F" description="Toggle fullscreen" />
-              <ShortcutRow keys="R" description="Refresh data" />
               <ShortcutRow keys="Esc" description="Close panels/overlays" />
               <ShortcutRow keys="?" description="Show/hide this help" />
             </div>
-            <Button
-              variant="outline"
-              className="mt-4 w-full"
-              onClick={() => ui.setShowShortcutsOverlay(false)}
-            >
+            <Button variant="outline" className="mt-4 w-full" onClick={() => ui.setShowShortcutsOverlay(false)}>
               Close
             </Button>
           </div>
@@ -291,10 +229,59 @@ export default function ArenaPit() {
 function ShortcutRow({ keys, description }: { keys: string; description: string }) {
   return (
     <div className="flex items-center justify-between text-sm">
-      <kbd className="rounded border border-border bg-muted px-2 py-1 font-mono text-foreground">
-        {keys}
-      </kbd>
+      <kbd className="rounded border border-border bg-muted px-2 py-1 font-mono text-foreground">{keys}</kbd>
       <span className="text-muted-foreground">{description}</span>
     </div>
+  )
+}
+
+// Inline leaderboard entry since we removed the external sidebar component dependency
+import { TraderState, PerformanceBadge, getPerformanceBadge, getPerformanceBand } from '@/types/arena-pit'
+import { TrendingUp, TrendingDown, AlertTriangle, Crown } from 'lucide-react'
+
+function LeaderboardEntry({ trader, isSelected, isHighlighted, onClick, totalTraders }: {
+  trader: TraderState; isSelected: boolean; isHighlighted: boolean; onClick: () => void; totalTraders: number
+}) {
+  const badge = getPerformanceBadge(trader)
+  const band = getPerformanceBand(trader.currentRank, totalTraders)
+
+  const formatPnl = (value: number) => {
+    const sign = value >= 0 ? '+' : ''
+    return `${sign}$${value.toFixed(2)}`
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        'group relative w-full rounded-lg border p-2.5 text-left transition-all duration-200',
+        'hover:bg-accent/50',
+        isSelected && 'border-primary/60 bg-primary/10',
+        isHighlighted && 'animate-pulse border-yellow-500/60 bg-yellow-500/10',
+        !isSelected && !isHighlighted && 'border-border',
+        band === 'top' && !isSelected && !isHighlighted && 'border-green-500/20',
+      )}
+    >
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            'flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold',
+            trader.currentRank <= 3 ? 'bg-yellow-500/20 text-yellow-400' : 'bg-muted text-muted-foreground'
+          )}>
+            {trader.currentRank <= 3 ? ['🥇','🥈','🥉'][trader.currentRank-1] : trader.currentRank}
+          </div>
+          <span className="text-xs font-medium text-foreground truncate max-w-[120px]">{trader.name}</span>
+        </div>
+        {trader.isLive && <div className="h-1.5 w-1.5 animate-pulse rounded-full bg-green-400" />}
+      </div>
+      <div className="flex items-center justify-between">
+        <span className={cn('font-mono text-sm font-semibold tabular-nums', trader.totalPnl >= 0 ? 'text-green-400' : 'text-red-400')}>
+          {formatPnl(trader.totalPnl)}
+        </span>
+        <span className="text-[10px] text-muted-foreground">
+          ${trader.totalEquity.toFixed(2)}
+        </span>
+      </div>
+    </button>
   )
 }

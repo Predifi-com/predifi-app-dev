@@ -352,36 +352,42 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
     'CryptoWhale', 'DeFi_Degen', 'AlphaHunter', 'LiquidityKing',
     'MarketMaker_X', 'Satoshi_Fan', 'ETH_Maxi', 'SOL_Surfer',
     'LeverageLord', 'DeltaNeutral', 'GigaBrain', 'ApeInto',
-    'YieldFarmer', 'MEV_Bot_42', 'OnChainSage', 'PerpTrader99'
+    'YieldFarmer', 'MEV_Bot_42', 'OnChainSage', 'PerpTrader99',
+    'ChartWizard', 'FundingHunter', 'ScalpKing', 'VolTrader',
+    'MomentumX', 'RiskTaker_1', 'ProfitPilot', 'BearSlayer',
+    'BullRunner', 'TrendSurfer', 'FlipMaster', 'ArbiKing',
+    'HedgeLord', 'SwingTrader', 'BreakoutBot', 'PatternPro',
+    'OBReader', 'WhaleWatch', 'LiqHunter', 'FibTrader',
+    'VWAPKing', 'DeltaForce', 'GammaSqueeze', 'ThetaGang',
+    'VegaTrader', 'IVCrusher', 'SpreadKing', 'BasisTrader',
+    'CarryTrade', 'AlgoRunner', 'SmartMoney', 'DegenApe',
+    'DiamondHands', 'PaperTrader'
   ]
 
   return names.map((name, i) => {
     const addr = `0x${(i + 1).toString(16).padStart(40, '0')}`
 
-    // Starting balance $100. PnL ranges from -$40 to +$60 (realistic for 7 days)
-    const pnlRange = (Math.random() - 0.4) * 100 // skews slightly negative
-    const pnl = Math.round(pnlRange * 100) / 100
-    const currentBalance = 100 + pnl
-    // How much is in positions vs unused
-    const positionRatio = 0.2 + Math.random() * 0.6 // 20-80% deployed
+    // Starting balance $100. PnL ranges from -$35 to +$55 (realistic for 7 days)
+    const pnl = Math.round(((Math.random() - 0.4) * 90) * 100) / 100
+    const currentBalance = Math.max(10, 100 + pnl)
+    const positionRatio = 0.2 + Math.random() * 0.5
     const unusedBalance = Math.max(5, currentBalance * (1 - positionRatio))
 
-    // BTC position: ~$20-50 notional at most (0.0002 - 0.0005 BTC at ~$100k)
-    const btcNotional = Math.random() > 0.4 ? (10 + Math.random() * 40) : 0
+    // BTC: ~$10-40 notional
+    const btcNotional = Math.random() > 0.4 ? (10 + Math.random() * 30) : 0
     const btcPrice = 97500 + Math.random() * 5000
-    const btcSize = btcNotional / btcPrice // ~0.0001-0.0005
+    const btcSize = btcNotional / btcPrice
 
-    // ETH position: ~$15-40 notional (0.004 - 0.012 ETH at ~$3500)
-    const ethNotional = Math.random() > 0.3 ? (10 + Math.random() * 30) : 0
+    // ETH: ~$10-30 notional
+    const ethNotional = Math.random() > 0.3 ? (10 + Math.random() * 20) : 0
     const ethPrice = 3400 + Math.random() * 400
-    const ethSize = ethNotional / ethPrice // ~0.003-0.01
+    const ethSize = ethNotional / ethPrice
 
-    // SOL position: ~$10-30 notional (0.05 - 0.15 SOL at ~$200)
-    const solNotional = Math.random() > 0.5 ? (5 + Math.random() * 25) : 0
+    // SOL: ~$5-25 notional
+    const solNotional = Math.random() > 0.5 ? (5 + Math.random() * 20) : 0
     const solPrice = 195 + Math.random() * 30
-    const solSize = solNotional / solPrice // ~0.03-0.13
+    const solSize = solNotional / solPrice
 
-    // Direction: long or short (not both for simplicity)
     const btcLong = Math.random() > 0.45
     const ethLong = Math.random() > 0.4
     const solLong = Math.random() > 0.5
@@ -410,10 +416,10 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
           avgShortEntry: !solLong ? solPrice * (1 + Math.random() * 0.05) : 0
         }
       },
-      totalVolumeEpoch: Math.round((200 + Math.random() * 800) * 100) / 100, // $200-$1000 cumulative volume
-      tradeCountEpoch: Math.floor(3 + Math.random() * 25), // 3-28 trades over 7 days
-      fundingPaid: Math.round(Math.random() * 2 * 100) / 100, // $0-$2
-      fundingReceived: Math.round(Math.random() * 1.5 * 100) / 100 // $0-$1.50
+      totalVolumeEpoch: Math.round((150 + Math.random() * 600) * 100) / 100,
+      tradeCountEpoch: Math.floor(3 + Math.random() * 25),
+      fundingPaid: Math.round(Math.random() * 2 * 100) / 100,
+      fundingReceived: Math.round(Math.random() * 1.5 * 100) / 100
     }
   })
 }
@@ -491,7 +497,7 @@ export async function fetchArenaPitState(
     // Return mock data for development
     return {
       traders: generateMockTraders(),
-      totalCount: 16,
+      totalCount: 50,
       epochEndTimestamp: Date.now() + 4 * 60 * 60 * 1000,
       epochStartTimestamp: Date.now() - 30 * 60 * 1000,
       epochId: 'mock-epoch-1',
