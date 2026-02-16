@@ -15,7 +15,7 @@ import Header from '@/components/Header'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
-const PANELS_PER_PAGE = 12
+const PANELS_PER_PAGE = 16
 
 export default function ArenaPit() {
   const { address: userAddress } = useWallet()
@@ -44,7 +44,6 @@ export default function ArenaPit() {
 
   const handleTraderClick = (address: string) => ui.expandTrader(address)
   const handleLeaderboardClick = (address: string, rank: number) => ui.jumpToTrader(address, rank)
-  const handlePairClick = (pair: string) => toast.info(`Open trading modal for ${pair}`)
 
   const expandedTrader = traders.find((t) => t.address === ui.expandedTrader) || null
 
@@ -120,8 +119,8 @@ export default function ArenaPit() {
             </div>
           </div>
 
-          {/* Trader Grid - 4 columns, 3 rows, fills remaining space */}
-          <div className="grid flex-1 grid-cols-4 grid-rows-3 gap-2 min-h-0">
+          {/* Trader Grid - 4 columns, 4 rows */}
+          <div className="grid flex-1 grid-cols-4 grid-rows-4 gap-1.5 min-h-0">
             {visibleTraders.map((trader) => (
               <TraderPanel
                 key={trader.address}
@@ -129,7 +128,6 @@ export default function ArenaPit() {
                 prices={prices!}
                 isHighlighted={trader.address === ui.highlightedTrader}
                 onClick={() => handleTraderClick(trader.address)}
-                onPairClick={handlePairClick}
               />
             ))}
           </div>
@@ -183,7 +181,7 @@ export default function ArenaPit() {
           prices={prices}
           epoch={epoch}
           onClose={() => ui.expandTrader(null)}
-          onTradeClick={handlePairClick}
+          onTradeClick={undefined}
           onTraderSwitch={(address) => ui.expandTrader(address)}
           topContenders={traders.slice(0, 10)}
           userBalance={100}
