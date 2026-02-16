@@ -9,7 +9,7 @@ import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
 import { FlowWalletConnectors } from "@dynamic-labs/flow";
 import { SolanaWalletConnectors } from "@dynamic-labs/solana";
-import { SparkWalletConnectors } from "@dynamic-labs/spark";
+
 import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
 import { SuiWalletConnectors } from "@dynamic-labs/sui";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -65,7 +65,7 @@ const App = () => (
                 BitcoinWalletConnectors,
                 FlowWalletConnectors,
                 SolanaWalletConnectors,
-                SparkWalletConnectors,
+                
                 StarknetWalletConnectors,
                 SuiWalletConnectors,
               ],
