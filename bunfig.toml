@@ -1,3 +1,4 @@
 [install]
-# Skip native compilation scripts that fail in sandboxed environments
-ignoredScripts = ["usb", "@trezor/transport"]
+# Prevent ALL lifecycle/install scripts from running
+# This stops usb's node-gyp rebuild entirely
+trustedDependencies = []
