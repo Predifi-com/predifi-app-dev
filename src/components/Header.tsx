@@ -204,17 +204,6 @@ const Header = () => {
               <ArenaEquityBadge compact onClick={() => setDepositOpen(true)} />
             )}
 
-            {/* Deposit Button */}
-            {isConnected && (
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="h-8 text-xs hidden sm:flex"
-                onClick={() => setDepositOpen(true)}
-              >
-                Deposit
-              </Button>
-            )}
 
             {/* Settings - Hidden on mobile */}
             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-warning hidden sm:flex" asChild>
@@ -349,19 +338,6 @@ const Header = () => {
             <ThemeToggle />
           </div>
 
-          {/* Deposit Button - Mobile */}
-          {isConnected && (
-            <Button 
-              variant="outline" 
-              className="w-full mt-4"
-              onClick={() => {
-                setDepositOpen(true);
-                setMobileMenuOpen(false);
-              }}
-            >
-              Deposit
-            </Button>
-          )}
         </nav>
       </div>
 
