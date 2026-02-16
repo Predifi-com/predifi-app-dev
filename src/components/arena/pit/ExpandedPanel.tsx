@@ -149,35 +149,35 @@ export function ExpandedPanel({
         <div className="space-y-6">
           {/* Performance Summary */}
           <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="text-sm text-white/50">Total P&L</div>
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm text-muted-foreground">Total P&L</div>
               <div className={cn(
                 'mt-1 font-mono text-2xl font-bold tabular-nums',
-                trader.totalPnl >= 0 ? 'text-green-400' : 'text-red-400'
+                trader.totalPnl >= 0 ? 'text-success' : 'text-destructive'
               )}>
                 {formatPnl(trader.totalPnl)}
               </div>
-              <div className="mt-0.5 text-xs text-white/50">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {trader.totalPnlPercentage >= 0 ? '+' : ''}{trader.totalPnlPercentage.toFixed(2)}% ROI
               </div>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="text-sm text-white/50">Total Equity</div>
-              <div className="mt-1 font-mono text-2xl font-bold text-white tabular-nums">
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm text-muted-foreground">Total Equity</div>
+              <div className="mt-1 font-mono text-2xl font-bold text-foreground tabular-nums">
                 ${trader.totalEquity.toLocaleString()}
               </div>
-              <div className="mt-0.5 text-xs text-white/50">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 Balance: ${trader.unusedBalance.toLocaleString()}
               </div>
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="text-sm text-white/50">Epoch Volume</div>
-              <div className="mt-1 font-mono text-2xl font-bold text-white tabular-nums">
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm text-muted-foreground">Epoch Volume</div>
+              <div className="mt-1 font-mono text-2xl font-bold text-foreground tabular-nums">
                 ${(trader.epochVolume / 1000).toFixed(0)}K
               </div>
-              <div className="mt-0.5 text-xs text-white/50">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 {trader.epochTradeCount} trades
               </div>
             </div>
@@ -185,7 +185,7 @@ export function ExpandedPanel({
 
           {/* Position Details */}
           <div className="space-y-3">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-white/70">
+            <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
               Positions
             </h3>
             {pairs.map((pair) => {
@@ -198,17 +198,17 @@ export function ExpandedPanel({
               return (
                 <div
                   key={pair}
-                  className="rounded-lg border border-white/10 bg-white/5 p-4"
+                  className="rounded-lg border border-border bg-muted p-4"
                 >
                   <div className="flex items-center justify-between mb-3">
-                    <h4 className="text-lg font-semibold text-white">{pair}/USD</h4>
+                    <h4 className="text-lg font-semibold text-foreground">{pair}/USD</h4>
                     <div className="text-right">
-                      <div className="font-mono text-sm text-white/70">
+                      <div className="font-mono text-sm text-muted-foreground">
                         ${price.toLocaleString()}
                       </div>
                       <div className={cn(
                         'font-mono text-lg font-bold',
-                        exposure.pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                        exposure.pnl >= 0 ? 'text-success' : 'text-destructive'
                       )}>
                         {formatPnl(exposure.pnl)}
                       </div>
@@ -217,40 +217,40 @@ export function ExpandedPanel({
 
                   <div className="grid grid-cols-2 gap-4">
                     {exposure.longSize > 0 && (
-                      <div className="rounded border border-green-500/30 bg-green-500/10 p-3">
-                        <div className="text-xs text-green-400 font-semibold">LONG POSITION</div>
+                      <div className="rounded border border-success/30 bg-success/10 p-3">
+                        <div className="text-xs text-success font-semibold">LONG POSITION</div>
                         <div className="mt-2 space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-white/50">Size:</span>
-                            <span className="font-mono text-white">{exposure.longSize.toFixed(4)}</span>
+                            <span className="text-muted-foreground">Size:</span>
+                            <span className="font-mono text-foreground">{exposure.longSize.toFixed(4)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-white/50">Avg Entry:</span>
-                            <span className="font-mono text-white">{formatPrice(exposure.avgLongEntry)}</span>
+                            <span className="text-muted-foreground">Avg Entry:</span>
+                            <span className="font-mono text-foreground">{formatPrice(exposure.avgLongEntry)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-white/50">Current:</span>
-                            <span className="font-mono text-white">{formatPrice(price)}</span>
+                            <span className="text-muted-foreground">Current:</span>
+                            <span className="font-mono text-foreground">{formatPrice(price)}</span>
                           </div>
                         </div>
                       </div>
                     )}
 
                     {exposure.shortSize > 0 && (
-                      <div className="rounded border border-red-500/30 bg-red-500/10 p-3">
-                        <div className="text-xs text-red-400 font-semibold">SHORT POSITION</div>
+                      <div className="rounded border border-destructive/30 bg-destructive/10 p-3">
+                        <div className="text-xs text-destructive font-semibold">SHORT POSITION</div>
                         <div className="mt-2 space-y-1 text-sm">
                           <div className="flex justify-between">
-                            <span className="text-white/50">Size:</span>
-                            <span className="font-mono text-white">{exposure.shortSize.toFixed(4)}</span>
+                            <span className="text-muted-foreground">Size:</span>
+                            <span className="font-mono text-foreground">{exposure.shortSize.toFixed(4)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-white/50">Avg Entry:</span>
-                            <span className="font-mono text-white">{formatPrice(exposure.avgShortEntry)}</span>
+                            <span className="text-muted-foreground">Avg Entry:</span>
+                            <span className="font-mono text-foreground">{formatPrice(exposure.avgShortEntry)}</span>
                           </div>
                           <div className="flex justify-between">
-                            <span className="text-white/50">Current:</span>
-                            <span className="font-mono text-white">{formatPrice(price)}</span>
+                            <span className="text-muted-foreground">Current:</span>
+                            <span className="font-mono text-foreground">{formatPrice(price)}</span>
                           </div>
                         </div>
                       </div>
@@ -260,7 +260,7 @@ export function ExpandedPanel({
                   {/* Quick Trade Button */}
                   <Button
                     onClick={() => onTradeClick?.(pair)}
-                    className="mt-3 w-full bg-blue-500 hover:bg-blue-600"
+                    className="mt-3 w-full bg-primary hover:bg-primary/90"
                   >
                     Trade {pair}
                   </Button>
@@ -271,28 +271,28 @@ export function ExpandedPanel({
 
           {/* Additional Stats */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="text-sm text-white/50">Leverage</div>
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm text-muted-foreground">Leverage</div>
               <div className={cn(
                 'mt-1 font-mono text-xl font-bold',
-                trader.leverage > 10 ? 'text-orange-400' : 'text-white'
+                trader.leverage > 10 ? 'text-warning' : 'text-foreground'
               )}>
                 {trader.leverage.toFixed(2)}x
               </div>
               {trader.liquidationRisk && (
-                <div className="mt-1 text-xs text-red-400">⚠️ High risk</div>
+                <div className="mt-1 text-xs text-destructive">⚠️ High risk</div>
               )}
             </div>
 
-            <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-              <div className="text-sm text-white/50">Net Funding</div>
+            <div className="rounded-lg border border-border bg-muted p-4">
+              <div className="text-sm text-muted-foreground">Net Funding</div>
               <div className={cn(
                 'mt-1 font-mono text-xl font-bold',
-                trader.netFunding >= 0 ? 'text-green-400' : 'text-red-400'
+                trader.netFunding >= 0 ? 'text-success' : 'text-destructive'
               )}>
                 {formatPnl(trader.netFunding)}
               </div>
-              <div className="mt-0.5 text-xs text-white/50">
+              <div className="mt-0.5 text-xs text-muted-foreground">
                 Paid: ${trader.fundingPaid.toFixed(2)} | Received: ${trader.fundingReceived.toFixed(2)}
               </div>
             </div>
@@ -300,7 +300,7 @@ export function ExpandedPanel({
 
           {/* Historical Performance */}
           <div className="space-y-3">
-            <h3 className="text-lg font-semibold text-white">
+            <h3 className="text-lg font-semibold text-foreground">
               📈 Historical Performance
             </h3>
             <div className="grid grid-cols-2 gap-4">
@@ -314,31 +314,31 @@ export function ExpandedPanel({
           </div>
 
           {/* Prediction Market */}
-          <div className="space-y-4 border-t border-white/10 pt-6">
+          <div className="space-y-4 border-t border-border pt-6">
             <div>
-              <h3 className="text-lg font-semibold text-white mb-1">
+              <h3 className="text-lg font-semibold text-foreground mb-1">
                 🎯 Prediction Market
               </h3>
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-muted-foreground">
                 Competition #{epoch?.id || 'N/A'} - Multi-Outcome Market
               </p>
             </div>
 
             {/* Market Stats */}
-            <div className="rounded-lg bg-white/5 p-4 space-y-3">
+            <div className="rounded-lg bg-muted p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-white/70">Will {trader.name} win?</span>
-                <span className="text-2xl font-bold text-white">
+                <span className="text-muted-foreground">Will {trader.name} win?</span>
+                <span className="text-2xl font-bold text-foreground">
                   {(marketData.probability * 100).toFixed(1)}%
                 </span>
               </div>
 
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
-                  <span className="text-white/50">Odds Movement:</span>
+                  <span className="text-muted-foreground">Odds Movement:</span>
                   <span className={cn(
                     "font-semibold flex items-center gap-0.5",
-                    marketData.oddsChange > 0 ? "text-green-400" : "text-red-400"
+                    marketData.oddsChange > 0 ? "text-success" : "text-destructive"
                   )}>
                     {marketData.oddsChange > 0 ? "↑" : "↓"}
                     {Math.abs(marketData.oddsChange).toFixed(1)}%
@@ -346,8 +346,8 @@ export function ExpandedPanel({
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <span className="text-white/50">Volume:</span>
-                  <span className="text-white font-mono">
+                  <span className="text-muted-foreground">Volume:</span>
+                  <span className="text-foreground font-mono">
                     {formatCurrency(marketData.volume)}
                   </span>
                 </div>
@@ -355,8 +355,8 @@ export function ExpandedPanel({
             </div>
 
             {/* Betting Interface */}
-            <div className="rounded-lg border border-white/10 bg-[#0e1118] p-6 space-y-4">
-              <h4 className="font-semibold text-white">Place Your Bet</h4>
+            <div className="rounded-lg border border-border bg-card p-6 space-y-4">
+              <h4 className="font-semibold text-foreground">Place Your Bet</h4>
 
               {/* YES/NO Toggle */}
               <div className="grid grid-cols-2 gap-3">
@@ -365,7 +365,7 @@ export function ExpandedPanel({
                   variant={betSide === 'YES' ? 'default' : 'outline'}
                   className={cn(
                     "h-16 text-lg font-semibold",
-                    betSide === 'YES' && "bg-green-500 hover:bg-green-600"
+                    betSide === 'YES' && "bg-success hover:bg-success/90"
                   )}
                 >
                   <div className="flex flex-col items-center gap-1">
@@ -381,7 +381,7 @@ export function ExpandedPanel({
                   variant={betSide === 'NO' ? 'default' : 'outline'}
                   className={cn(
                     "h-16 text-lg font-semibold",
-                    betSide === 'NO' && "bg-red-500 hover:bg-red-600"
+                    betSide === 'NO' && "bg-destructive hover:bg-destructive/90"
                   )}
                 >
                   <div className="flex flex-col items-center gap-1">
@@ -403,29 +403,29 @@ export function ExpandedPanel({
                   onChange={(e) => setBetAmount(e.target.value)}
                   className="font-mono text-lg"
                 />
-                <div className="flex justify-between text-sm text-white/50">
+                <div className="flex justify-between text-sm text-muted-foreground">
                   <span>You receive: ~{calculatedShares.toFixed(1)} shares</span>
                   <span>Balance: ${userBalance.toFixed(2)}</span>
                 </div>
               </div>
 
               {/* Potential Payout */}
-              <div className="rounded-lg bg-white/5 p-4 space-y-2">
+              <div className="rounded-lg bg-muted p-4 space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/70">If {betSide === 'YES' ? 'wins' : 'loses'}:</span>
-                  <span className="text-green-400 font-semibold font-mono">
+                  <span className="text-muted-foreground">If {betSide === 'YES' ? 'wins' : 'loses'}:</span>
+                  <span className="text-success font-semibold font-mono">
                     +${potentialProfit.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/70">Profit:</span>
-                  <span className="text-white font-semibold">
+                  <span className="text-muted-foreground">Profit:</span>
+                  <span className="text-foreground font-semibold">
                     {profitPercentage.toFixed(1)}%
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/70">If wrong:</span>
-                  <span className="text-red-400 font-mono">$0.00</span>
+                  <span className="text-muted-foreground">If wrong:</span>
+                  <span className="text-destructive font-mono">$0.00</span>
                 </div>
               </div>
 
@@ -441,24 +441,24 @@ export function ExpandedPanel({
 
             {/* User's Current Position (if any) */}
             {userPosition && (
-              <div className="rounded-lg border border-yellow-500/30 bg-yellow-500/5 p-4">
+              <div className="rounded-lg border border-warning/30 bg-warning/5 p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-yellow-400 font-semibold">Your Position</span>
-                  <span className="text-sm text-white/50">
+                  <span className="text-warning font-semibold">Your Position</span>
+                  <span className="text-sm text-muted-foreground">
                     {userPosition.shares.toFixed(1)} {userPosition.side} shares
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/70">Avg Price:</span>
-                  <span className="text-white font-mono">
+                  <span className="text-muted-foreground">Avg Price:</span>
+                  <span className="text-foreground font-mono">
                     ${userPosition.avgPrice.toFixed(2)}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-white/70">Unrealized PnL:</span>
+                  <span className="text-muted-foreground">Unrealized PnL:</span>
                   <span className={cn(
                     "font-semibold font-mono",
-                    userPosition.unrealizedPnL >= 0 ? "text-green-400" : "text-red-400"
+                    userPosition.unrealizedPnL >= 0 ? "text-success" : "text-destructive"
                   )}>
                     {userPosition.unrealizedPnL >= 0 ? "+" : ""}
                     ${userPosition.unrealizedPnL.toFixed(2)}
@@ -470,7 +470,7 @@ export function ExpandedPanel({
             {/* Other Top Contenders */}
             {topContenders.length > 0 && (
               <div className="space-y-2">
-                <h4 className="text-sm font-semibold text-white/70">
+                <h4 className="text-sm font-semibold text-muted-foreground">
                   💡 Other Top Contenders
                 </h4>
                 <div className="space-y-2">
@@ -478,17 +478,17 @@ export function ExpandedPanel({
                     <button
                       key={contender.address}
                       onClick={() => onTraderSwitch?.(contender.address)}
-                      className="w-full flex items-center justify-between p-3 rounded-lg bg-white/5 hover:bg-white/10 transition"
+                      className="w-full flex items-center justify-between p-3 rounded-lg bg-muted hover:bg-muted/70 transition"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-white/50">#{contender.currentRank}</span>
-                        <span className="text-white font-medium">{contender.name}</span>
+                        <span className="text-muted-foreground">#{contender.currentRank}</span>
+                        <span className="text-foreground font-medium">{contender.name}</span>
                       </div>
                       <div className="flex items-center gap-3">
-                        <span className="text-white/70 font-mono">
+                        <span className="text-muted-foreground font-mono">
                           {((contender.marketData?.probability || 0) * 100).toFixed(1)}% odds
                         </span>
-                        <span className="text-blue-400 text-sm">View →</span>
+                        <span className="text-primary text-sm">View →</span>
                       </div>
                     </button>
                   ))}
@@ -505,9 +505,9 @@ export function ExpandedPanel({
 // Stat Component for Historical Performance
 function Stat({ label, value, icon }: { label: string; value: string | number; icon?: string }) {
   return (
-    <div className="rounded-lg border border-white/10 bg-white/5 p-3">
-      <div className="text-xs text-white/50">{label}</div>
-      <div className="mt-1 font-mono text-lg font-bold text-white tabular-nums">
+    <div className="rounded-lg border border-border bg-muted p-3">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-1 font-mono text-lg font-bold text-foreground tabular-nums">
         {icon && <span className="mr-1">{icon}</span>}
         {value}
       </div>
