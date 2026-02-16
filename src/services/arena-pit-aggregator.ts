@@ -67,7 +67,7 @@ function aggregatePositions(
   market: PairSymbol
 ): TraderExposure {
   const marketPositions = positions.filter((p) =>
-    p.market.symbol.toUpperCase().includes(market)
+    (p.marketSymbol || p.market).toUpperCase().includes(market)
   )
 
   let longSize = 0
@@ -120,22 +120,22 @@ export async function fetchGlobalPrices(): Promise<GlobalPrices> {
       BTC: {
         symbol: 'BTC',
         price: btcData.price,
-        change24h: btcTicker?.priceChange24h || 0,
-        change24hPercentage: btcTicker?.priceChangePercentage24h || 0,
+        change24h: 0,
+        change24hPercentage: 0,
         lastUpdate: Date.now()
       },
       ETH: {
         symbol: 'ETH',
         price: ethData.price,
-        change24h: ethTicker?.priceChange24h || 0,
-        change24hPercentage: ethTicker?.priceChangePercentage24h || 0,
+        change24h: 0,
+        change24hPercentage: 0,
         lastUpdate: Date.now()
       },
       SOL: {
         symbol: 'SOL',
         price: solData.price,
-        change24h: solTicker?.priceChange24h || 0,
-        change24hPercentage: solTicker?.priceChangePercentage24h || 0,
+        change24h: 0,
+        change24hPercentage: 0,
         lastUpdate: Date.now()
       }
     }
