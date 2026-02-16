@@ -18,7 +18,6 @@
     "@dynamic-labs/flow": "^4.45.2",
     "@dynamic-labs/sdk-react-core": "^4.45.2",
     "@dynamic-labs/solana": "^4.45.2",
-    "@dynamic-labs/spark": "^4.45.2",
     "@dynamic-labs/starknet": "^4.45.2",
     "@dynamic-labs/sui": "^4.45.2",
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
