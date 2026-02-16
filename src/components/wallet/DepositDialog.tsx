@@ -53,6 +53,8 @@ export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogPr
       // Set the wallet balance to the on-chain value
       if (usdcBalance > 0) {
         await walletAPI.deposit(usdcBalance);
+        const { clearAllTradingState } = await import('@/hooks/useTradingStore');
+        clearAllTradingState();
         onSuccess();
       } else {
         toast.info('No USDC found at this address on Optimism.');
@@ -99,7 +101,7 @@ export function DepositDialog({ open, onOpenChange, onSuccess }: DepositDialogPr
           <div className="text-xs space-y-1 text-muted-foreground">
             <p>⚠️ Only send USDC on Optimism</p>
             <p>⏱️ Deposits appear after confirmations (~30 seconds)</p>
-            <p>💡 Minimum deposit: $1</p>
+            <p>💡 Minimum deposit: $3</p>
           </div>
 
           {/* Track Deposit */}
