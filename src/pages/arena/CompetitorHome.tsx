@@ -181,10 +181,6 @@ export default function CompetitorHome() {
                     Claims
                   </TabsTrigger>
                 </TabsList>
-                
-                  key={positionsKey} 
-                  arenaWalletAddress={currentArenaWallet.address} 
-                  compact 
                
                 {/* Chart positions checkbox */}
                 <label className="flex items-center gap-2 text-xs text-[#787b86] cursor-pointer">
