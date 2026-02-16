@@ -4,7 +4,6 @@
  */
 
 import { useMemo } from 'react'
-import { GlobalPriceBar } from '@/components/arena/pit/GlobalPriceBar'
 import { LeaderboardSidebar } from '@/components/arena/pit/LeaderboardSidebar'
 import { TraderPanel } from '@/components/arena/pit/TraderPanel'
 import { ExpandedPanel } from '@/components/arena/pit/ExpandedPanel'
@@ -75,17 +74,7 @@ export default function ArenaPit() {
     <div className="flex h-screen flex-col overflow-hidden bg-background">
       <Header />
 
-      {prices && (
-        <GlobalPriceBar
-          prices={prices}
-          epochState={epochState}
-          timeRemaining={timeRemaining}
-          totalPnl={aggregateStats.totalPnl}
-          totalVolume={aggregateStats.totalVolume}
-          totalTraders={traders.length}
-          totalBetVolume={totalBetVolume}
-        />
-      )}
+      {/* Price bar removed */}
 
       {/* Main area: sidebar + grid */}
       <div className="flex flex-1 overflow-hidden">

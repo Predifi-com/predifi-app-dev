@@ -56,7 +56,8 @@ export function calculateEquity(
   unusedBalance: number,
   totalPnl: number
 ): number {
-  return unusedBalance + totalPnl
+  // Equity can't go below 0 — trader would be liquidated before that
+  return Math.max(0, unusedBalance + totalPnl)
 }
 
 /**
@@ -367,24 +368,25 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
   return names.map((name, i) => {
     const addr = `0x${(i + 1).toString(16).padStart(40, '0')}`
 
-    // Starting balance $100. PnL ranges from -$35 to +$55 (realistic for 7 days)
-    const pnl = Math.round(((Math.random() - 0.4) * 90) * 100) / 100
-    const currentBalance = Math.max(10, 100 + pnl)
-    const positionRatio = 0.2 + Math.random() * 0.5
-    const unusedBalance = Math.max(5, currentBalance * (1 - positionRatio))
+    // Starting balance $100. PnL ranges from -$60 to +$55 (realistic for 7 days)
+    // Equity = starting balance + PnL, but never below $5 (would be liquidated before zero)
+    const pnl = Math.round(((Math.random() - 0.45) * 80) * 100) / 100
+    const totalEquity = Math.max(5, 100 + pnl)
+    const positionRatio = 0.2 + Math.random() * 0.4
+    const unusedBalance = Math.round(totalEquity * (1 - positionRatio) * 100) / 100
 
-    // BTC: ~$10-40 notional
-    const btcNotional = Math.random() > 0.4 ? (10 + Math.random() * 30) : 0
+    // BTC: notional sized relative to equity
+    const btcNotional = Math.random() > 0.4 ? (totalEquity * positionRatio * (0.3 + Math.random() * 0.5)) : 0
     const btcPrice = 97500 + Math.random() * 5000
     const btcSize = btcNotional / btcPrice
 
-    // ETH: ~$10-30 notional
-    const ethNotional = Math.random() > 0.3 ? (10 + Math.random() * 20) : 0
+    // ETH: notional sized relative to equity
+    const ethNotional = Math.random() > 0.3 ? (totalEquity * positionRatio * (0.2 + Math.random() * 0.4)) : 0
     const ethPrice = 3400 + Math.random() * 400
     const ethSize = ethNotional / ethPrice
 
-    // SOL: ~$5-25 notional
-    const solNotional = Math.random() > 0.5 ? (5 + Math.random() * 20) : 0
+    // SOL: notional sized relative to equity
+    const solNotional = Math.random() > 0.5 ? (totalEquity * positionRatio * (0.1 + Math.random() * 0.3)) : 0
     const solPrice = 195 + Math.random() * 30
     const solSize = solNotional / solPrice
 
@@ -395,7 +397,7 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
     return {
       address: addr,
       name,
-      unusedBalance: Math.round(unusedBalance * 100) / 100,
+      unusedBalance,
       exposure: {
         BTC: {
           longSize: btcLong && btcSize > 0 ? Math.round(btcSize * 100000) / 100000 : 0,
@@ -416,10 +418,10 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
           avgShortEntry: !solLong ? solPrice * (1 + Math.random() * 0.05) : 0
         }
       },
-      totalVolumeEpoch: Math.round((150 + Math.random() * 600) * 100) / 100,
-      tradeCountEpoch: Math.floor(3 + Math.random() * 25),
-      fundingPaid: Math.round(Math.random() * 2 * 100) / 100,
-      fundingReceived: Math.round(Math.random() * 1.5 * 100) / 100
+      totalVolumeEpoch: Math.round((100 + Math.random() * 400) * 100) / 100,
+      tradeCountEpoch: Math.floor(3 + Math.random() * 20),
+      fundingPaid: Math.round(Math.random() * 1 * 100) / 100,
+      fundingReceived: Math.round(Math.random() * 0.8 * 100) / 100
     }
   })
 }
