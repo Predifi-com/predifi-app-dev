@@ -109,11 +109,13 @@ function _closePosition(id: string) {
   emit();
 }
 
-function _clearAll() {
+export function clearAllTradingState() {
   _positions = [];
   _orders = [];
+  _notifications = [];
   localStorage.setItem(STORAGE_KEY, '[]');
   localStorage.setItem(ORDERS_KEY, '[]');
+  localStorage.setItem(NOTIF_KEY, '[]');
   emit();
 }
 
@@ -142,7 +144,7 @@ export function useTradingStore() {
     unreadNotifCount,
     openPosition: _openPosition,
     closePosition: _closePosition,
-    clearAll: _clearAll,
+    clearAll: clearAllTradingState,
     markNotifRead: _markNotifRead,
   };
 }
