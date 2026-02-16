@@ -12,6 +12,8 @@ import { useArenaPit, useArenaPitUI, useArenaPitKeyboard } from '@/hooks/useAren
 import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
 import { ChevronLeft, ChevronRight, Loader2, RefreshCw, Keyboard } from 'lucide-react'
+import Header from '@/components/Header'
+import { DensityMode } from '@/types/arena-pit'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -65,7 +67,7 @@ export default function ArenaPit() {
   // Show loading state
   if (loading && traders.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0e1118]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-12 w-12 animate-spin text-white/50" />
           <p className="text-white/70">Loading Arena Pit...</p>
@@ -77,7 +79,7 @@ export default function ArenaPit() {
   // Show error state
   if (error && traders.length === 0) {
     return (
-      <div className="flex h-screen items-center justify-center bg-[#0e1118]">
+      <div className="flex h-screen items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <p className="text-red-400">{error}</p>
           <Button onClick={refresh} variant="outline">
@@ -89,7 +91,8 @@ export default function ArenaPit() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0e1118]">
+    <div className="min-h-screen bg-background">
+      <Header />
       {/* Global Price Bar */}
       {prices && epoch && (
         <GlobalPriceBar
@@ -123,9 +126,9 @@ export default function ArenaPit() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => ui.setDensityMode('compact')}
+                  onClick={() => ui.setDensityMode(DensityMode.COMPACT)}
                   className={cn(
-                    ui.densityMode === 'compact' && 'bg-white/10'
+                    ui.densityMode === DensityMode.COMPACT && 'bg-white/10'
                   )}
                 >
                   Compact
@@ -133,9 +136,9 @@ export default function ArenaPit() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => ui.setDensityMode('balanced')}
+                  onClick={() => ui.setDensityMode(DensityMode.BALANCED)}
                   className={cn(
-                    ui.densityMode === 'balanced' && 'bg-white/10'
+                    ui.densityMode === DensityMode.BALANCED && 'bg-white/10'
                   )}
                 >
                   Balanced
@@ -143,9 +146,9 @@ export default function ArenaPit() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => ui.setDensityMode('detailed')}
+                  onClick={() => ui.setDensityMode(DensityMode.DETAILED)}
                   className={cn(
-                    ui.densityMode === 'detailed' && 'bg-white/10'
+                    ui.densityMode === DensityMode.DETAILED && 'bg-white/10'
                   )}
                 >
                   Detailed
