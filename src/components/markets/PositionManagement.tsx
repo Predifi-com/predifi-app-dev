@@ -16,7 +16,7 @@ function computeYesProb(currentPrice: number, baseline: number) {
   return Math.min(95, Math.max(5, 50 + ((currentPrice - baseline) / baseline) * 100 * 25));
 }
 
-function PositionRow({ position, onClose }: { position: any; onClose: () => void }) {
+function PositionRow({ position, onClose }: { position: any; onClose: (pnl: number) => void }) {
   const { price: currentPrice } = usePriceTicker(position.asset);
   const { baseline } = useMarketBaseline(position.asset, position.timeframe);
 
@@ -41,7 +41,7 @@ function PositionRow({ position, onClose }: { position: any; onClose: () => void
         <span className="text-muted-foreground font-normal ml-1">({pnlPercent.toFixed(1)}%)</span>
       </td>
       <td className="p-2 pr-4 text-right">
-        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive hover:text-destructive" onClick={onClose}>
+        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-destructive hover:text-destructive" onClick={() => onClose(pnl)}>
           <X className="w-3 h-3 mr-1" /> Close
         </Button>
       </td>
@@ -53,19 +53,21 @@ export function PositionManagement() {
   const [tab, setTab] = useState("positions");
   const { positions, orders, closePosition } = useTradingStore();
 
-  const handleClose = async (posId: string) => {
+  const handleClose = async (posId: string, pnl: number) => {
     const pos = positions.find((p) => p.id === posId);
     if (pos) {
-      // Return margin to available balance
+      // Return margin + profit (or margin - loss) to available balance
+      const returnAmount = pos.size + pnl;
       try {
-        // We'll add the margin back via deposit
-        await walletAPI.deposit(pos.size);
+        if (returnAmount > 0) {
+          await walletAPI.deposit(returnAmount);
+        }
       } catch (err) {
         console.error("Failed to return margin:", err);
       }
     }
     closePosition(posId);
-    toast.success("Position closed");
+    toast.success(`Position closed${pnl >= 0 ? ` — +$${pnl.toFixed(2)} profit` : ` — -$${Math.abs(pnl).toFixed(2)} loss`}`);
   };
 
   const openOrders = orders.filter((_, i) => false); // No open orders in demo — all are instantly filled
@@ -104,7 +106,7 @@ export function PositionManagement() {
               </thead>
               <tbody>
                 {positions.map((pos) => (
-                  <PositionRow key={pos.id} position={pos} onClose={() => handleClose(pos.id)} />
+                  <PositionRow key={pos.id} position={pos} onClose={(pnl) => handleClose(pos.id, pnl)} />
                 ))}
                 {positions.length === 0 && (
                   <tr><td colSpan={7} className="text-center p-6 text-muted-foreground">No open positions</td></tr>
