@@ -344,11 +344,24 @@ export function calculateStateChecksum(traders: TraderState[]): string {
 }
 
 /**
- * Generate mock traders for development
- * Each trader starts with $100 and trades for up to 7 days.
- * Position sizes, PnL, and volumes are realistic for a $100 starting balance.
+ * Seeded pseudo-random number generator for deterministic mock data
  */
+function createSeededRng(seed: number) {
+  return () => {
+    seed = (seed * 16807 + 0) % 2147483647
+    return (seed & 0x7fffffff) / 0x7fffffff
+  }
+}
+
+/**
+ * Generate mock traders for development (deterministic + cached)
+ * Each trader starts with $100 and trades for up to 7 days.
+ */
+let _cachedMockTraders: ArenaPitApiResponse['traders'] | null = null
+
 function generateMockTraders(): ArenaPitApiResponse['traders'] {
+  if (_cachedMockTraders) return _cachedMockTraders
+
   const names = [
     'CryptoWhale', 'DeFi_Degen', 'AlphaHunter', 'LiquidityKing',
     'MarketMaker_X', 'Satoshi_Fan', 'ETH_Maxi', 'SOL_Surfer',
@@ -365,34 +378,31 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
     'DiamondHands', 'PaperTrader'
   ]
 
-  return names.map((name, i) => {
+  _cachedMockTraders = names.map((name, i) => {
     const addr = `0x${(i + 1).toString(16).padStart(40, '0')}`
+    // Deterministic RNG seeded from trader index
+    const rng = createSeededRng(42 + i * 137)
 
-    // Starting balance $100. PnL ranges from -$60 to +$55 (realistic for 7 days)
-    // Equity = starting balance + PnL, but never below $5 (would be liquidated before zero)
-    const pnl = Math.round(((Math.random() - 0.45) * 80) * 100) / 100
+    const pnl = Math.round(((rng() - 0.45) * 80) * 100) / 100
     const totalEquity = Math.max(5, 100 + pnl)
-    const positionRatio = 0.2 + Math.random() * 0.4
+    const positionRatio = 0.2 + rng() * 0.4
     const unusedBalance = Math.round(totalEquity * (1 - positionRatio) * 100) / 100
 
-    // BTC: notional sized relative to equity
-    const btcNotional = Math.random() > 0.4 ? (totalEquity * positionRatio * (0.3 + Math.random() * 0.5)) : 0
-    const btcPrice = 97500 + Math.random() * 5000
+    const btcNotional = rng() > 0.4 ? (totalEquity * positionRatio * (0.3 + rng() * 0.5)) : 0
+    const btcPrice = 97500 + rng() * 5000
     const btcSize = btcNotional / btcPrice
 
-    // ETH: notional sized relative to equity
-    const ethNotional = Math.random() > 0.3 ? (totalEquity * positionRatio * (0.2 + Math.random() * 0.4)) : 0
-    const ethPrice = 3400 + Math.random() * 400
+    const ethNotional = rng() > 0.3 ? (totalEquity * positionRatio * (0.2 + rng() * 0.4)) : 0
+    const ethPrice = 3400 + rng() * 400
     const ethSize = ethNotional / ethPrice
 
-    // SOL: notional sized relative to equity
-    const solNotional = Math.random() > 0.5 ? (totalEquity * positionRatio * (0.1 + Math.random() * 0.3)) : 0
-    const solPrice = 195 + Math.random() * 30
+    const solNotional = rng() > 0.5 ? (totalEquity * positionRatio * (0.1 + rng() * 0.3)) : 0
+    const solPrice = 195 + rng() * 30
     const solSize = solNotional / solPrice
 
-    const btcLong = Math.random() > 0.45
-    const ethLong = Math.random() > 0.4
-    const solLong = Math.random() > 0.5
+    const btcLong = rng() > 0.45
+    const ethLong = rng() > 0.4
+    const solLong = rng() > 0.5
 
     return {
       address: addr,
@@ -402,38 +412,47 @@ function generateMockTraders(): ArenaPitApiResponse['traders'] {
         BTC: {
           longSize: btcLong && btcSize > 0 ? Math.round(btcSize * 100000) / 100000 : 0,
           shortSize: !btcLong && btcSize > 0 ? Math.round(btcSize * 100000) / 100000 : 0,
-          avgLongEntry: btcLong ? btcPrice * (1 - Math.random() * 0.03) : 0,
-          avgShortEntry: !btcLong ? btcPrice * (1 + Math.random() * 0.03) : 0
+          avgLongEntry: btcLong ? btcPrice * (1 - rng() * 0.03) : 0,
+          avgShortEntry: !btcLong ? btcPrice * (1 + rng() * 0.03) : 0
         },
         ETH: {
           longSize: ethLong && ethSize > 0 ? Math.round(ethSize * 10000) / 10000 : 0,
           shortSize: !ethLong && ethSize > 0 ? Math.round(ethSize * 10000) / 10000 : 0,
-          avgLongEntry: ethLong ? ethPrice * (1 - Math.random() * 0.04) : 0,
-          avgShortEntry: !ethLong ? ethPrice * (1 + Math.random() * 0.04) : 0
+          avgLongEntry: ethLong ? ethPrice * (1 - rng() * 0.04) : 0,
+          avgShortEntry: !ethLong ? ethPrice * (1 + rng() * 0.04) : 0
         },
         SOL: {
           longSize: solLong && solSize > 0 ? Math.round(solSize * 10000) / 10000 : 0,
           shortSize: !solLong && solSize > 0 ? Math.round(solSize * 10000) / 10000 : 0,
-          avgLongEntry: solLong ? solPrice * (1 - Math.random() * 0.05) : 0,
-          avgShortEntry: !solLong ? solPrice * (1 + Math.random() * 0.05) : 0
+          avgLongEntry: solLong ? solPrice * (1 - rng() * 0.05) : 0,
+          avgShortEntry: !solLong ? solPrice * (1 + rng() * 0.05) : 0
         }
       },
-      totalVolumeEpoch: Math.round((100 + Math.random() * 400) * 100) / 100,
-      tradeCountEpoch: Math.floor(3 + Math.random() * 20),
-      fundingPaid: Math.round(Math.random() * 1 * 100) / 100,
-      fundingReceived: Math.round(Math.random() * 0.8 * 100) / 100
+      totalVolumeEpoch: Math.round((100 + rng() * 400) * 100) / 100,
+      tradeCountEpoch: Math.floor(3 + rng() * 20),
+      fundingPaid: Math.round(rng() * 1 * 100) / 100,
+      fundingReceived: Math.round(rng() * 0.8 * 100) / 100
     }
   })
+
+  return _cachedMockTraders
 }
 
 /**
- * Generate mock global prices
+ * Generate mock global prices (stable, not random per call)
  */
+const _stableMockPrices: GlobalPrices = {
+  BTC: { symbol: 'BTC', price: 99850, change24h: 1200, change24hPercentage: 1.25, lastUpdate: Date.now() },
+  ETH: { symbol: 'ETH', price: 3620, change24h: 85, change24hPercentage: 2.5, lastUpdate: Date.now() },
+  SOL: { symbol: 'SOL', price: 212, change24h: 8, change24hPercentage: 4.1, lastUpdate: Date.now() }
+}
+
 function generateMockPrices(): GlobalPrices {
+  // Return stable prices with updated timestamp
   return {
-    BTC: { symbol: 'BTC', price: 97500 + Math.random() * 5000, change24h: 1200, change24hPercentage: 1.25, lastUpdate: Date.now() },
-    ETH: { symbol: 'ETH', price: 3400 + Math.random() * 400, change24h: 85, change24hPercentage: 2.5, lastUpdate: Date.now() },
-    SOL: { symbol: 'SOL', price: 195 + Math.random() * 30, change24h: 8, change24hPercentage: 4.1, lastUpdate: Date.now() }
+    BTC: { ..._stableMockPrices.BTC, lastUpdate: Date.now() },
+    ETH: { ..._stableMockPrices.ETH, lastUpdate: Date.now() },
+    SOL: { ..._stableMockPrices.SOL, lastUpdate: Date.now() }
   }
 }
 
