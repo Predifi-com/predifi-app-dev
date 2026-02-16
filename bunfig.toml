@@ -1,0 +1,3 @@
+[install]
+# Skip native compilation scripts that fail in sandboxed environments
+ignoredScripts = ["usb", "@trezor/transport"]
