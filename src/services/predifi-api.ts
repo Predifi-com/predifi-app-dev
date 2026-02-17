@@ -259,25 +259,12 @@ class PredifiApiService {
   // ============= Volume Normalization =============
 
   /**
-   * Limitless volumes are in raw USDC (6 decimals).
-   * Polymarket and Predifi volumes are already in USD.
-   * Normalize so all consumers see USD values.
+   * Note: Backend (LimitlessConnector.ts) already converts USDC to USD.
+   * No additional normalization needed in frontend.
    */
   private normalizeMarketVolumes(market: PredifiMarket): PredifiMarket {
-    if (market.venue === 'limitless') {
-      const div = 1_000_000;
-      return {
-        ...market,
-        volume_24h: market.volume_24h / div,
-        volume_total: market.volume_total / div,
-        liquidity: market.liquidity / div,
-        open_interest: market.open_interest / div,
-        outcomes: market.outcomes?.map(o => ({
-          ...o,
-          volume: o.volume / div,
-        })) ?? market.outcomes,
-      };
-    }
+    // Backend already handles USDC -> USD conversion (/ 1e6)
+    // Just pass through without modification
     return market;
   }
 

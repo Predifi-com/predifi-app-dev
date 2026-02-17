@@ -1,9 +1,10 @@
 /**
- * Predifi WebSocket Service v2
- * URL: wss://api.predifi.com
+ * Predifi WebSocket Service v3 - Supabase Realtime
+ * Using Supabase Realtime instead of Socket.IO for better integration
  */
 
-const WS_URL = 'wss://api.predifi.com';
+import { supabase } from '@/integrations/supabase/db';
+import type { RealtimeChannel } from '@supabase/supabase-js';
 
 export type WebSocketChannel = 'markets' | 'orderbook' | 'trades' | 'positions';
 
@@ -40,135 +41,66 @@ export interface OrderbookUpdateEvent {
 export type WebSocketCallback = (event: WebSocketEvent) => void;
 
 export class WebSocketService {
-  private ws: WebSocket | null = null;
-  private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
+  private channels: Map<string, RealtimeChannel> = new Map();
   private callbacks: Map<string, Set<WebSocketCallback>> = new Map();
-  private isConnecting = false;
-  private isIntentionalClose = false;
 
-  constructor(private url: string = WS_URL) {}
+  constructor() {}
 
   connect(): Promise<void> {
-    if (this.ws?.readyState === WebSocket.OPEN) return Promise.resolve();
-    if (this.isConnecting) return Promise.resolve();
+    console.log('✅ Supabase Realtime ready');
+    return Promise.resolve();
+  }
 
-    this.isIntentionalClose = false;
-    this.isConnecting = true;
+  subscribeToMarkets(marketIds?: string[]): void {
+    const channelName = 'markets-realtime';
+    if (this.channels.has(channelName)) return;
 
-    return new Promise((resolve, reject) => {
-      try {
-        this.ws = new WebSocket(this.url);
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'markets' }, (payload) => {
+        const market = payload.new as any;
+        this.handleMessage({
+          type: 'market_update',
+          market_id: market.id,
+          yes_price: market.yes_price,
+          no_price: market.no_price,
+          volume_24h: market.volume_24h,
+          last_trade_price: market.last_trade_price,
+          timestamp: new Date().toISOString(),
+        });
+      })
+      .subscribe();
 
-        this.ws.onopen = () => {
-          console.log('WebSocket connected to', this.url);
-          this.reconnectAttempts = 0;
-          this.isConnecting = false;
-          resolve();
-        };
+    this.channels.set(channelName, channel);
+  }
 
-        this.ws.onmessage = (event) => {
-          try {
-            const message: WebSocketEvent = JSON.parse(event.data);
-            this.handleMessage(message);
-          } catch (error) {
-            console.error('Failed to parse WebSocket message:', error);
-          }
-        };
-
-        this.ws.onerror = (error) => {
-          console.error('WebSocket error:', error);
-          this.isConnecting = false;
-          reject(error);
-        };
-
-        this.ws.onclose = () => {
-          console.log('WebSocket disconnected');
-          this.isConnecting = false;
-          if (!this.isIntentionalClose) this.attemptReconnect();
-        };
-      } catch (error) {
-        this.isConnecting = false;
-        reject(error);
-      }
-    });
+  subscribe(channel: WebSocketChannel, marketId?: string): void {
+    if (channel === 'markets') this.subscribeToMarkets(marketId ? [marketId] : undefined);
   }
 
   disconnect(): void {
-    this.isIntentionalClose = true;
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.channels.forEach((channel) => supabase.removeChannel(channel));
+    this.channels.clear();
   }
 
-  private attemptReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max WebSocket reconnect attempts reached');
-      return;
-    }
-
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
-
-    console.log(`Reconnecting in ${delay}ms (${this.reconnectAttempts}/${this.maxReconnectAttempts})`);
-    setTimeout(() => {
-      this.connect().catch((e) => console.error('Reconnection failed:', e));
-    }, delay);
+  on(eventType: WebSocketEventType | WebSocketChannel, callback: WebSocketCallback): void {
+    if (!this.callbacks.has(eventType)) this.callbacks.set(eventType, new Set());
+    this.callbacks.get(eventType)!.add(callback);
   }
 
-  /** Subscribe to channels for specific markets (v2 format) */
-  subscribeToMarkets(channels: WebSocketChannel[], marketIds: string[]): void {
-    this.send({ type: 'subscribe', channels, marketIds });
-  }
-
-  /** Unsubscribe from channels for specific markets (v2 format) */
-  unsubscribeFromMarkets(channels: WebSocketChannel[], marketIds: string[]): void {
-    this.send({ type: 'unsubscribe', channels, marketIds });
-  }
-
-  /** Generic channel-based subscribe with callback (returns unsubscribe fn) */
-  subscribe(channel: string, callback: WebSocketCallback): () => void {
-    if (!this.callbacks.has(channel)) {
-      this.callbacks.set(channel, new Set());
-    }
-    this.callbacks.get(channel)!.add(callback);
-
-    return () => {
-      const cbs = this.callbacks.get(channel);
-      if (cbs) {
-        cbs.delete(callback);
-        if (cbs.size === 0) this.callbacks.delete(channel);
-      }
-    };
+  off(eventType: WebSocketEventType | WebSocketChannel, callback: WebSocketCallback): void {
+    this.callbacks.get(eventType)?.delete(callback);
   }
 
   private handleMessage(message: WebSocketEvent): void {
-    const channels = [
-      message.type,
-      message.market_id ? `market:${message.market_id}` : null,
-      'all',
-    ].filter(Boolean) as string[];
-
-    channels.forEach((ch) => {
-      this.callbacks.get(ch)?.forEach((cb) => {
-        try { cb(message); } catch (e) { console.error(`WS callback error (${ch}):`, e); }
-      });
-    });
-  }
-
-  send(data: any): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(data));
-    } else {
-      console.warn('WebSocket not connected. Message not sent:', data);
+    this.callbacks.get(message.type)?.forEach(cb => cb(message));
+    if (message.type === 'market_update') {
+      this.callbacks.get('markets')?.forEach(cb => cb(message));
     }
   }
 
-  get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
-  }
+  get isConnected(): boolean { return true; }
 }
 
-export const wsService = new WebSocketService();
+export const websocketService = new WebSocketService();
+export const wsService = websocketService;

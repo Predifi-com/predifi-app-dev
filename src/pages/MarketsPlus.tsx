@@ -420,6 +420,7 @@ const Markets = () => {
                     yesPercentage={item.market.yesPercentage}
                     noPercentage={item.market.noPercentage}
                     totalVolume={item.market.totalVolume}
+                    liquidity={item.market.liquidity}
                     venue={item.market.venue}
                     imageUrl={item.market.imageUrl}
                     endDate={item.market.endDate}

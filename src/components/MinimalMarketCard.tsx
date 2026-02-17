@@ -19,6 +19,7 @@ interface MinimalMarketCardProps {
   yesPercentage: number;
   noPercentage: number;
   totalVolume?: number;
+  liquidity?: number;
   volume?: string;
   venue?: string;
   imageUrl?: string;
@@ -31,9 +32,9 @@ interface MinimalMarketCardProps {
 }
 
 function formatVolume(volume: number): string {
-  if (volume >= 1_000_000) return `$${(volume / 1_000_000).toFixed(2)}mn`;
-  if (volume >= 10_000) return `$${(volume / 1_000).toFixed(2)}k`;
-  if (volume > 0) return `$${volume.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  if (volume >= 1_000_000) return `$${(volume / 1_000_000).toFixed(1)}mn`;
+  if (volume >= 1_000) return `$${(volume / 1_000).toFixed(1)}k`;
+  if (volume > 0) return `$${volume.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
   return "$0";
 }
 
@@ -62,6 +63,7 @@ export function MinimalMarketCard({
   yesPercentage,
   noPercentage,
   totalVolume,
+  liquidity,
   volume,
   venue = "predifi",
   imageUrl,
@@ -75,10 +77,9 @@ export function MinimalMarketCard({
   const [modalOpen, setModalOpen] = useState(false);
   const [aiChatOpen, setAiChatOpen] = useState(false);
 
-  const displayVolume =
-    totalVolume !== undefined && totalVolume !== null
-      ? formatVolume(totalVolume)
-      : volume || "$0";
+  // Show volume if > 0, otherwise show liquidity
+  const effectiveVolume = (totalVolume && totalVolume > 0) ? totalVolume : (liquidity || 0);
+  const displayVolume = effectiveVolume > 0 ? formatVolume(effectiveVolume) : (volume || "$0");
 
   const venueLabel = getVenueDisplayName(venue);
   const isMultiOutcome = marketType === "multi_outcome" && outcomes && outcomes.length > 2;
