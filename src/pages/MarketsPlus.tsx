@@ -149,6 +149,7 @@ const Markets = () => {
     category: category,
     venue: venue,
     status: showClosed ? undefined : 'active',
+    search: searchQuery,
     limit: 40,
   });
 

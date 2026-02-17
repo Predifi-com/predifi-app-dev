@@ -277,6 +277,7 @@ class PredifiApiService {
     venue?: 'limitless' | 'polymarket' | 'predifi';
     category?: string;
     status?: 'active' | 'resolved' | 'expired';
+    q?: string;
   }): Promise<ListMarketsResponse> {
     const q = new URLSearchParams();
     if (params) {
