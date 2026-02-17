@@ -25,7 +25,6 @@ function formatVolume(v: number): string {
   return v.toFixed(0);
 }
 
-/** API returns yes_price/no_price in 0-100 percentage range. Round to display as cents. */
 function priceToCents(price: number | null | undefined): number {
   if (price == null) return 50;
   return Math.round(price);
@@ -44,7 +43,6 @@ const MarketDetail = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch market from API
   useEffect(() => {
     if (!id) return;
     setIsLoading(true);
@@ -67,26 +65,26 @@ const MarketDetail = () => {
   useEffect(() => {
     if (!id || !market) return;
 
-    service.subscribeToMarkets(['markets', 'orderbook', 'trades'], [market.venue_market_id || id]);
+    service.subscribeToMarkets([market.venue_market_id || id]);
 
-    const unsubscribe = service.subscribe(`market:${id}`, (event: WebSocketEvent) => {
+    const handler = (event: WebSocketEvent) => {
       if (event.type === 'market_update') {
         const update = event as unknown as MarketUpdateEvent;
-        setMarket((prev) =>
-          prev ? {
-            ...prev,
-            yes_price: update.yes_price ?? prev.yes_price,
-            no_price: update.no_price ?? prev.no_price,
-            volume_24h: update.volume_24h ?? prev.volume_24h,
-          } : prev
-        );
+        if (update.market_id === id || update.market_id === market.venue_market_id) {
+          setMarket((prev) =>
+            prev ? {
+              ...prev,
+              yes_price: update.yes_price ?? prev.yes_price,
+              no_price: update.no_price ?? prev.no_price,
+              volume_24h: update.volume_24h ?? prev.volume_24h,
+            } : prev
+          );
+        }
       }
-    });
-
-    return () => {
-      unsubscribe();
-      service.unsubscribeFromMarkets(['markets', 'orderbook', 'trades'], [market.venue_market_id || id]);
     };
+
+    service.on('market_update', handler);
+    return () => { service.off('market_update', handler); };
   }, [id, market?.venue_market_id, service]);
 
   // Track page view

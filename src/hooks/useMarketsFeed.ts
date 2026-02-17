@@ -120,12 +120,16 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
   }, [fetchMarkets]);
 
   // Re-fetch when filter params change — reset pagination state
+  // Use a stable key to avoid re-triggering from object identity changes
+  const filterKey = `${params.category}|${params.venue}|${params.status}`;
   useEffect(() => {
     setOffset(0);
     setLastBatchSize(0);
     setTotal(0);
+    setMarkets([]);
     fetchMarkets(0, false);
-  }, [params.category, params.venue, params.status, fetchMarkets]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]);
 
   return {
     markets,
