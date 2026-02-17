@@ -306,16 +306,18 @@ const Markets = () => {
   // Infinite scroll observer
   const sentinelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!sentinelRef.current || !hasMore) return;
+    if (!sentinelRef.current || !hasMore || error || isLoadingMore) return;
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) loadMore();
+        if (entries[0].isIntersecting && !isLoadingMore && !error) {
+          loadMore();
+        }
       },
       { rootMargin: '200px' }
     );
     observer.observe(sentinelRef.current);
     return () => observer.disconnect();
-  }, [hasMore, loadMore]);
+  }, [hasMore, loadMore, error, isLoadingMore]);
 
   const gridColsClass = density === 'compact'
     ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
