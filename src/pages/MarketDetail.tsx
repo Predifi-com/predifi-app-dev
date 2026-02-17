@@ -52,8 +52,7 @@ const MarketDetail = () => {
     predifiApi.listAggregatedMarkets({ limit: 300 }).then((res) => {
       const found = res.markets.find((m) => 
         m.id === id || 
-        m.venue_market_id === id || 
-        m.slug === id
+        m.venue_market_id === id
       );
       if (found) {
         setMarket(found);
