@@ -61,7 +61,7 @@ export const publicRoutes: RouteConfig[] = [
   { path: "/terms-of-service", component: TermsOfService, transition: "page" },
   // Markets browsing - publicly accessible
   { path: "/markets", component: Markets, transition: "page" },
-  { path: "/markets/:id", component: MarketDetail, skeleton: "detail", transition: "slide" },
+  { path: "/markets/:slug", component: MarketTrade, skeleton: "detail", transition: "slide" },
   { path: "/markets-plus", component: MarketsPlus, transition: "page" },
   { path: "/markets-plus/:id", component: MarketDetail, skeleton: "detail", transition: "slide" },
   { path: "/leaderboard", component: Leaderboard, skeleton: "table", transition: "page" },
