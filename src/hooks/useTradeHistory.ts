@@ -19,7 +19,6 @@ export const useTradeHistory = (marketId: string, limit: number = 50): UseTradeH
   useEffect(() => {
     if (!marketId) return;
 
-    // Fetch initial trade history
     const fetchInitialTrades = async () => {
       setIsLoading(true);
       try {
@@ -35,24 +34,18 @@ export const useTradeHistory = (marketId: string, limit: number = 50): UseTradeH
 
     fetchInitialTrades();
 
-    // Subscribe to real-time trade updates
-    const unsubscribe = service.subscribe(`market:${marketId}`, (event: WebSocketEvent) => {
+    const handler = (event: WebSocketEvent) => {
       if (event.type === "trade") {
         const trade = event.data as Trade;
         if (trade.marketId === marketId) {
           setTrades((prev) => [trade, ...prev].slice(0, limit));
         }
       }
-    });
-
-    return () => {
-      unsubscribe();
     };
+
+    service.on('trades', handler);
+    return () => { service.off('trades', handler); };
   }, [marketId, limit, service]);
 
-  return {
-    trades,
-    isLoading,
-    error,
-  };
+  return { trades, isLoading, error };
 };

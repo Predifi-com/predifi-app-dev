@@ -61,16 +61,17 @@ export const usePortfolio = (userAddress?: string): UsePortfolioResult => {
 
     if (!userAddress) return;
 
-    const unsubscribe = service.subscribe("position_update", (event: WebSocketEvent) => {
+    const handler = (event: WebSocketEvent) => {
       if (event.type === "position_update") {
         const update = event as any;
         if (update.userAddress === userAddress) {
           fetchPortfolio();
         }
       }
-    });
+    };
 
-    return () => { unsubscribe(); };
+    service.on('positions', handler);
+    return () => { service.off('positions', handler); };
   }, [userAddress, service]);
 
   return { positions, transactions, summary, analytics, isLoading, error, refresh };

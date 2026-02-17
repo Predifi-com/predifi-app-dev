@@ -26,7 +26,6 @@ export const useOrderbook = (marketId: string): UseOrderbookResult => {
         if (data && typeof data === 'object' && Array.isArray((data as any).bids) && (data as any).bids.length > 0) {
           setOrderbook(data as unknown as Orderbook);
         }
-        // If API returns empty, orderbook stays null — component shows empty state
       } catch (err) {
         setError(err instanceof Error ? err : new Error("Failed to fetch orderbook"));
         console.error("Error fetching orderbook:", err);
@@ -37,13 +36,14 @@ export const useOrderbook = (marketId: string): UseOrderbookResult => {
 
     fetchInitialOrderbook();
 
-    const unsubscribe = service.subscribe(`market:${marketId}`, (event: WebSocketEvent) => {
-      if (event.type === "orderbook_update") {
+    const handler = (event: WebSocketEvent) => {
+      if (event.type === "orderbook_update" && event.market_id === marketId) {
         setOrderbook(event as unknown as Orderbook);
       }
-    });
+    };
 
-    return () => { unsubscribe(); };
+    service.on('orderbook', handler);
+    return () => { service.off('orderbook', handler); };
   }, [marketId, service]);
 
   return { orderbook, isLoading, error };
