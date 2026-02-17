@@ -50,7 +50,11 @@ const MarketDetail = () => {
     setError(null);
 
     predifiApi.listAggregatedMarkets({ limit: 300 }).then((res) => {
-      const found = res.markets.find((m) => m.id === id);
+      const found = res.markets.find((m) => 
+        m.id === id || 
+        m.venue_market_id === id || 
+        m.slug === id
+      );
       if (found) {
         setMarket(found);
       } else {
