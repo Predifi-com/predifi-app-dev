@@ -19,7 +19,8 @@ import { useWebSocket } from "@/providers/WebSocketProvider";
 import { predifiApi, type PredifiMarket } from "@/services/predifi-api";
 import type { WebSocketEvent, MarketUpdateEvent } from "@/services/websocket";
 
-function formatVolume(v: number): string {
+function formatVolume(v: number | null | undefined): string {
+  if (v == null || isNaN(v)) return '0';
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}K`;
   return v.toFixed(0);
