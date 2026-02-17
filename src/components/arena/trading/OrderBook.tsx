@@ -1,6 +1,7 @@
 import { useMemo, useEffect, useState } from 'react';
 import { useMarketPrice } from '@/hooks/useGmxMarkets';
-import { getMarketByAddress } from '@/config/gmx';
+import { useRealtimePrices } from '@/services/gmx-websocket';
+import { getMarketByAddress, GMX_CONFIG } from '@/config/gmx';
 import { cn } from '@/lib/utils';
 import { Info } from 'lucide-react';
 import {
@@ -54,8 +55,20 @@ function generateGmxLiquidityLevels(
   return side === 'ask' ? result.reverse() : result;
 }
 
+// Map market address to symbol for ticker lookup
+const ADDRESS_TO_SYMBOL: Record<string, string> = {
+  [GMX_CONFIG.markets.BTC_USD.address]: 'BTC/USD',
+  [GMX_CONFIG.markets.ETH_USD.address]: 'ETH/USD',
+  [GMX_CONFIG.markets.SOL_USD.address]: 'SOL/USD',
+};
+
 export function OrderBook({ marketAddress }: OrderBookProps) {
-  const { price: currentPrice } = useMarketPrice(marketAddress);
+  const { price: subgraphPrice } = useMarketPrice(marketAddress);
+  const tickerSymbol = marketAddress ? ADDRESS_TO_SYMBOL[marketAddress] : 'BTC/USD';
+  const { prices: tickerPrices } = useRealtimePrices(tickerSymbol ? [tickerSymbol] : []);
+  
+  // Use subgraph price if available, otherwise fall back to ticker API price
+  const currentPrice = subgraphPrice > 0 ? subgraphPrice : (tickerPrices[tickerSymbol || 'BTC/USD'] || 0);
   const marketConfig = marketAddress ? getMarketByAddress(marketAddress) : null;
   const [tick, setTick] = useState(0);
   const [showWarning, setShowWarning] = useState(true);

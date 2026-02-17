@@ -70,13 +70,15 @@ export function TradingChart({ marketAddress, showHeader = false }: TradingChart
         return;
       }
       
-      const chartCandles: CandlestickData<Time>[] = candles.map((c) => ({
-        time: c.timestamp as Time,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }));
+      const chartCandles: CandlestickData<Time>[] = candles
+        .filter((c) => c.open > 0 && c.close > 0 && c.high > 0 && c.low > 0) // Filter out zero-value candles
+        .map((c) => ({
+          time: c.timestamp as Time,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+        }));
       
       setOhlcData(chartCandles);
       if (chartCandles.length > 0) {
@@ -104,7 +106,7 @@ export function TradingChart({ marketAddress, showHeader = false }: TradingChart
       [gmxSymbol],
       (prices) => {
         const price = prices[`${gmxSymbol}/USD`];
-        if (!price || !lastCandleRef.current) return;
+        if (!price || price <= 0 || !lastCandleRef.current) return;
         
         setIsLive(true);
         setError(null); // Clear error on successful update
@@ -130,7 +132,7 @@ export function TradingChart({ marketAddress, showHeader = false }: TradingChart
         });
       },
       undefined, // onError callback (optional)
-      1000 // Poll every 1 second
+      5000 // Poll every 5 seconds (chart updates don't need to be as frequent)
     );
     
     priceSubscriptionRef.current = cleanup;

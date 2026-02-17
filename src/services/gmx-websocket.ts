@@ -75,7 +75,7 @@ export function useRealtimePrices(symbols: string[] = ['BTC/USD', 'ETH/USD', 'SO
         setIsConnected(true);
       },
       undefined, // onError callback (optional)
-      1000 // 1 second polling
+      3000 // 3 second polling (reduced from 1s to avoid rate limiting)
     );
     
     cleanupRef.current = cleanup;
