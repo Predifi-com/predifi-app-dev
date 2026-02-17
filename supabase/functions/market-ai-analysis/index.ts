@@ -15,15 +15,14 @@ serve(async (req) => {
     if (!GROQ_API_KEY) throw new Error("GROQ_API_KEY is not configured");
 
     const timeframeContext = timeframe === "hourly"
-      ? "Analyze the likely price movement in the next 5-15 minutes. Focus on short-term momentum, recent candle patterns, and intra-hour volatility."
-      : "Analyze the likely price movement over the next few hours. Consider daily trends, support/resistance levels, volume patterns, and broader market sentiment.";
+      ? "Focus on 5-15 minute momentum. Analyze short-term price action and immediate factors."
+      : "Focus on multi-hour trends. Consider broader momentum, support/resistance, and market sentiment.";
 
-    const systemPrompt = `You are a concise crypto market analyst for a prediction market platform. 
-You provide brief, actionable analysis in 2-3 short bullet points maximum.
-Focus on probability assessment for whether the asset will close above or below a specific baseline price.
-Use trading terminology but keep it accessible. Be direct and confident in your assessment.
-Never give financial advice disclaimers in the analysis itself.
-Format: Use bullet points (•). Keep total response under 100 words.`;
+    const systemPrompt = `Act as a concise crypto analyst. Provide 2-3 bullet points maximum, under 100 words total, using • bullets. Focus on:
+- Current momentum (bullish/bearish)
+- Key factors affecting price
+- Probability assessment for closing above/below baseline
+Be direct and actionable. No disclaimers.`;
 
     const userPrompt = `${asset}/USD prediction market analysis:
 - Current price: $${currentPrice}
