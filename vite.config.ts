@@ -32,4 +32,41 @@ export default defineConfig(({ mode }) => ({
       "usb": path.resolve(__dirname, "./src/stubs/noop.js"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Separate React and related libraries
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          
+          // Separate chart libraries (they're huge!)
+          'vendor-charts': ['recharts'],
+          
+          // Separate UI component libraries
+          'vendor-ui': [
+            '@radix-ui/react-dialog',
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-select',
+            '@radix-ui/react-tabs',
+            '@radix-ui/react-checkbox',
+            '@radix-ui/react-switch',
+            '@radix-ui/react-slider',
+            'framer-motion',
+          ],
+          
+          // Separate wallet/web3 libraries
+          'vendor-web3': [
+            '@dynamic-labs/sdk-react-core',
+            '@dynamic-labs/ethereum',
+            'ethers',
+            'viem',
+          ],
+          
+          // Separate date/time utilities
+          'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
+        },
+      },
+    },
+    chunkSizeWarningLimit: 1000, // Increase to 1000kb to reduce warnings
+  },
 }));
