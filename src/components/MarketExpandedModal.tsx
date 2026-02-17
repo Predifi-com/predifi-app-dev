@@ -66,7 +66,7 @@ export function MarketExpandedModal({
 
   const openFullPage = () => {
     onOpenChange(false);
-    navigate(`/markets-plus/${market.id}`);
+    navigate(`/markets-plus/${market.venue_market_id || market.id}`);
   };
 
   // Mock recent trades
