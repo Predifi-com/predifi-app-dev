@@ -32,7 +32,7 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
   const [offset, setOffset] = useState(0);
   const [lastBatchSize, setLastBatchSize] = useState(0);
 
-  const limit = params.limit || 50;
+  const limit = params.limit || 40;
 
   // Stable ref for current params to avoid stale closures
   const paramsRef = useRef(params);
@@ -79,17 +79,25 @@ export function useMarketsFeed(params: UseMarketsFeedParams): UseMarketsFeedResu
 
       if (append) {
         setMarkets(prev => {
+          // Deduplicate by market ID to prevent duplicates
           const existingIds = new Set(prev.map(m => m.id));
           const newOnly = fetchedMarkets.filter(m => !existingIds.has(m.id));
-          return [...prev, ...newOnly];
+
+          // Only update if we have new markets to add
+          if (newOnly.length > 0) {
+            return [...prev, ...newOnly];
+          }
+          return prev;
         });
+        // Update offset to the new position
+        setOffset(currentOffset + batchSize);
       } else {
         setMarkets(fetchedMarkets);
+        setOffset(currentOffset);
       }
 
       setLastBatchSize(batchSize);
       setTotal(response.total || 0);
-      setOffset(currentOffset);
 
       
     } catch (err: any) {

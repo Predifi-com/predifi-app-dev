@@ -149,7 +149,7 @@ const Markets = () => {
     category: category,
     venue: venue,
     status: showClosed ? undefined : 'active',
-    limit: 50,
+    limit: 40,
   });
 
   useEffect(() => {
@@ -306,49 +306,52 @@ const Markets = () => {
   // Infinite scroll observer with debouncing to prevent rapid requests
   const sentinelRef = useRef<HTMLDivElement>(null);
   const lastLoadTimeRef = useRef(0);
-  const observerRef = useRef<IntersectionObserver | null>(null);
-  
-  useEffect(() => {
-    // Clean up existing observer
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-      observerRef.current = null;
-    }
+  const isLoadingRef = useRef(false);
 
+  useEffect(() => {
     // Don't set up observer if conditions aren't met
-    if (!sentinelRef.current || !hasMore || error || isLoadingMore) return;
+    if (!sentinelRef.current || !hasMore || isLoading || error) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
+        const entry = entries[0];
+        if (!entry.isIntersecting) return;
+
         const now = Date.now();
         const timeSinceLastLoad = now - lastLoadTimeRef.current;
-        
+
         // Only trigger if:
         // 1. Element is intersecting
-        // 2. Not currently loading
+        // 2. Not currently loading (check both ref and state)
         // 3. No error
-        // 4. At least 500ms since last load (debounce)
-        if (entries[0].isIntersecting && !isLoadingMore && !error && timeSinceLastLoad > 500) {
+        // 4. Has more data to load
+        // 5. At least 500ms since last load (debounce)
+        if (!isLoadingRef.current && !isLoadingMore && !error && hasMore && timeSinceLastLoad > 500) {
+          isLoadingRef.current = true;
           lastLoadTimeRef.current = now;
           loadMore();
-          // Temporarily disconnect to prevent multiple triggers
-          observer.disconnect();
         }
       },
-      { 
-        rootMargin: '100px', // Reduced from 200px for better control
-        threshold: 0.1 
+      {
+        root: null,
+        rootMargin: '200px', // Trigger before user reaches the end
+        threshold: 0.1
       }
     );
-    
+
     observer.observe(sentinelRef.current);
-    observerRef.current = observer;
-    
+
     return () => {
       observer.disconnect();
-      observerRef.current = null;
     };
-  }, [hasMore, loadMore, error, isLoadingMore]);
+  }, [hasMore, loadMore, error, isLoadingMore, isLoading]);
+
+  // Reset loading ref when isLoadingMore changes
+  useEffect(() => {
+    if (!isLoadingMore) {
+      isLoadingRef.current = false;
+    }
+  }, [isLoadingMore]);
 
   const gridColsClass = density === 'compact'
     ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
