@@ -303,20 +303,51 @@ const Markets = () => {
     return items;
   }, [searchFiltered, sortBy]);
 
-  // Infinite scroll observer
+  // Infinite scroll observer with debouncing to prevent rapid requests
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const lastLoadTimeRef = useRef(0);
+  const observerRef = useRef<IntersectionObserver | null>(null);
+  
   useEffect(() => {
+    // Clean up existing observer
+    if (observerRef.current) {
+      observerRef.current.disconnect();
+      observerRef.current = null;
+    }
+
+    // Don't set up observer if conditions aren't met
     if (!sentinelRef.current || !hasMore || error || isLoadingMore) return;
+
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && !isLoadingMore && !error) {
+        const now = Date.now();
+        const timeSinceLastLoad = now - lastLoadTimeRef.current;
+        
+        // Only trigger if:
+        // 1. Element is intersecting
+        // 2. Not currently loading
+        // 3. No error
+        // 4. At least 500ms since last load (debounce)
+        if (entries[0].isIntersecting && !isLoadingMore && !error && timeSinceLastLoad > 500) {
+          lastLoadTimeRef.current = now;
           loadMore();
+          // Temporarily disconnect to prevent multiple triggers
+          observer.disconnect();
         }
       },
-      { rootMargin: '200px' }
+      { 
+        rootMargin: '100px', // Reduced from 200px for better control
+        threshold: 0.1 
+      }
     );
+    
     observer.observe(sentinelRef.current);
-    return () => observer.disconnect();
+    observerRef.current = observer;
+    
+    return () => {
+      observer.disconnect();
+      observerRef.current = null;
+    };
   }, [hasMore, loadMore, error, isLoadingMore]);
 
   const gridColsClass = density === 'compact'
