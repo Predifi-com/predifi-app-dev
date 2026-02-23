@@ -115,8 +115,9 @@ class ApiService {
     return res.positions;
   }
 
-  async getTransactions(_userAddress: string) {
-    return [];
+  async getTransactions(userAddress: string) {
+    const res = await predifiApi.getTransactions(userAddress);
+    return res.transactions ?? [];
   }
 
   async getPortfolioSummary(userAddress: string) {

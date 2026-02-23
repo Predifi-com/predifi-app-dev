@@ -144,7 +144,21 @@ export interface Position {
   entry_price: number;
   current_price: number;
   unrealized_pnl: number;
+  realized_pnl?: number;
   status: 'OPEN' | 'CLOSED' | 'LIQUIDATED';
+  opened_at?: string;
+  closed_at?: string | null;
+  venue?: string;
+}
+
+export interface TransactionRecord {
+  id: string;
+  user_id: string;
+  type: string;         // 'DEPOSIT' | 'WITHDRAW' | 'BUY' | 'SELL' | 'FEE' | 'PNL' | ...
+  amount: string;       // string from DB numeric
+  reference_id?: string;
+  metadata?: Record<string, unknown>;
+  created_at: string;
 }
 
 // ============= Price Feed Types =============
@@ -428,6 +442,21 @@ class PredifiApiService {
     const q = new URLSearchParams({ userId });
     if (status) q.append('status', status);
     return this.request(`/api/positions?${q}`);
+  }
+
+  async closePosition(positionId: string, userId: string): Promise<{ success: boolean; message?: string }> {
+    return this.request(`/api/positions/${encodeURIComponent(positionId)}/close`, {
+      method: 'POST',
+      body: JSON.stringify({ userId }),
+    });
+  }
+
+  // ============= Transactions =============
+
+  async getTransactions(walletAddress: string, limit = 50, offset = 0): Promise<{ transactions: TransactionRecord[] }> {
+    return this.request(
+      `/api/balance/${encodeURIComponent(walletAddress)}/transactions?limit=${limit}&offset=${offset}`
+    );
   }
 
   // ============= Price Feeds =============
