@@ -220,7 +220,7 @@ export function useRouterAccount(): RouterAccountState {
     } finally {
       setIsSweeping(false);
     }
-  }, [routerAddress, isDeployed, primaryWallet, refresh]);
+  }, [routerAddress, isReady, primaryWallet, refresh]);
 
   return {
     routerAddress,
