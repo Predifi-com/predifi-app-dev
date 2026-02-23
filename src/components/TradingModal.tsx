@@ -46,8 +46,8 @@ export const TradingModal = ({ open, onOpenChange, market, preselectedSide }: Tr
   const { trackActivity } = useActivityTracking();
 
   const isExternalVenue = market.venue && market.venue !== "predifi";
-  const feeRate = isExternalVenue ? 0.001 : 0.01;  // 0.1% external, 1% native
-  const feeLabel = isExternalVenue ? "0.1%" : "1%";
+  // 0.1% fee on external venue trades; no taker fee on native markets (3% deducted from winnings at settlement)
+  const feeRate = isExternalVenue ? 0.001 : 0;
 
   const price = side === "yes" ? market.yesPercentage / 100 : market.noPercentage / 100;
   const amountNum = parseFloat(amount) || 0;
@@ -287,10 +287,12 @@ export const TradingModal = ({ open, onOpenChange, market, preselectedSide }: Tr
                     <span className="text-muted-foreground">Potential Profit</span>
                     <span className="font-semibold text-success">+${potentialProfit.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between text-sm text-muted-foreground">
-                    <span>Platform fee ({feeLabel})</span>
-                    <span>${tradeFee.toFixed(3)}</span>
-                  </div>
+                  {isExternalVenue && tradeFee > 0 && (
+                    <div className="flex justify-between text-sm text-muted-foreground">
+                      <span>Platform fee (0.1%)</span>
+                      <span>${tradeFee.toFixed(3)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between pt-3 border-t">
                     <span className="font-medium">Total Cost</span>
                     <span className="font-bold text-lg">${(amountNum + tradeFee).toFixed(2)}</span>
