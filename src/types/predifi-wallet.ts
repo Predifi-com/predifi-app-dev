@@ -56,8 +56,20 @@ export interface PredifiWalletContextState {
   isConnected: boolean;
   
   // Protocol addresses
+  /** The user's deployed UserRouter address (their deposit address). */
   proxyAddress: string | null;
-  
+
+  // Router account (on-chain) — internal infrastructure, not exposed to users
+  /** True once the UserRouter is deployed and ready to receive funds */
+  isRouterReady: boolean;
+  /** True while the silent setup is in progress (check + optional deploy) */
+  isRouterSettingUp: boolean;
+  /** USDC sitting in the router that hasn't been swept yet */
+  routerUsdcBalance: string;
+  /** Sweep USDC from router → vault */
+  sweepRouter: () => Promise<void>;
+  /** Re-check router state */
+  refreshRouter: () => Promise<void>;
   // Balances
   ledgerBalance: number;
   ledgerBalanceLoading: boolean;

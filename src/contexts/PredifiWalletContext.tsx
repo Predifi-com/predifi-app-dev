@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { useWallet } from '@/hooks/useWallet';
+import { useRouterAccount } from '@/hooks/useRouterAccount';
+import { localBackend } from '@/services/local-backend';
 import { supabase } from '@/integrations/supabase/db';
 import { SUPPORTED_NETWORKS } from '@/config/gmx';
 import type {
@@ -13,12 +15,14 @@ const PredifiWalletContext = createContext<PredifiWalletContextState | null>(nul
 
 export function PredifiWalletProvider({ children }: { children: React.ReactNode }) {
   const { address, isConnected, wallet } = useWallet();
+
+  // ── On-chain router account (UserRouter contract) ─────────────────────────
+  const router = useRouterAccount();
   
   // Connected wallet state
   const [connectedWallet, setConnectedWallet] = useState<ConnectedWallet | null>(null);
   
-  // Protocol state
-  const [proxyAddress, setProxyAddress] = useState<string | null>(null);
+  // Protocol state — ledger balance from backend
   const [ledgerBalance, setLedgerBalance] = useState(0);
   const [ledgerBalanceLoading, setLedgerBalanceLoading] = useState(false);
   
@@ -44,13 +48,9 @@ export function PredifiWalletProvider({ children }: { children: React.ReactNode 
         type: walletType,
         provider,
       });
-      
-      // Derive proxy address (in production, this would come from backend)
-      // For now, use a deterministic derivation
-      setProxyAddress(`0x${address.slice(2, 42)}`); // Placeholder
+      // proxyAddress is now sourced from useRouterAccount
     } else {
       setConnectedWallet(null);
-      setProxyAddress(null);
       setLedgerBalance(0);
       setArenaWallets([]);
       setCurrentArenaWallet(null);
@@ -63,12 +63,13 @@ export function PredifiWalletProvider({ children }: { children: React.ReactNode 
     
     setLedgerBalanceLoading(true);
     try {
-      // In production, this would call backend API
-      // GET /api/user/ledger-balance
-      // For now, return mock data
-      setLedgerBalance(0);
+      const balance = await localBackend.getBalance(address);
+      const available = typeof balance.available === 'number' ? balance.available : parseFloat(String(balance.available) || '0');
+      setLedgerBalance(available);
     } catch (error) {
-      console.error('Failed to fetch ledger balance:', error);
+      // Backend may be unreachable in production — degrade gracefully
+      console.warn('[PredifiWalletContext] Failed to fetch ledger balance:', error);
+      setLedgerBalance(0);
     } finally {
       setLedgerBalanceLoading(false);
     }
@@ -155,7 +156,14 @@ export function PredifiWalletProvider({ children }: { children: React.ReactNode 
   const value = useMemo<PredifiWalletContextState>(() => ({
     connectedWallet,
     isConnected: !!connectedWallet,
-    proxyAddress,
+    // proxyAddress: the user's on-chain UserRouter (deposit address)
+    proxyAddress: router.routerAddress,
+    // Router account state (internal infra — not surfaced to users)
+    isRouterReady: router.isReady,
+    isRouterSettingUp: router.isSettingUp,
+    routerUsdcBalance: router.routerUsdcBalance,
+    sweepRouter: router.sweep,
+    refreshRouter: router.refresh,
     ledgerBalance,
     ledgerBalanceLoading,
     arenaWallets,
@@ -167,7 +175,12 @@ export function PredifiWalletProvider({ children }: { children: React.ReactNode 
     supportedNetworks: SUPPORTED_NETWORKS,
   }), [
     connectedWallet,
-    proxyAddress,
+    router.routerAddress,
+    router.isReady,
+    router.isSettingUp,
+    router.routerUsdcBalance,
+    router.sweep,
+    router.refresh,
     ledgerBalance,
     ledgerBalanceLoading,
     arenaWallets,

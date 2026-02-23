@@ -52,7 +52,7 @@ supabase functions deploy market-analysis
 ```bash
 # Set your environment variables
 export SUPABASE_FUNCTION_URL="https://your-project.supabase.co/functions/v1/market-analysis"
-export SUPABASE_ANON_KEY="your-anon-key"
+export SUPABASE_ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9odnNyYXB5b3BnYnNpc3NidnB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjkwODIsImV4cCI6MjA4NTcwNTA4Mn0.DE4tBkzdyfz4KTogozry3TrUzlQvn5lOngK9rZpheNs"
 
 # Run test suite
 ./test.sh

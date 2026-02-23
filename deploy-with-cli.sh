@@ -13,9 +13,9 @@ echo "╚═══════════════════════�
 echo ""
 
 # Project info from .env
-PROJECT_ID="dkmhcfgkiqerrizqxsbg"
-PROJECT_URL="https://dkmhcfgkiqerrizqxsbg.supabase.co"
-ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRrbWhjZmdraXFlcnJpenF4c2JnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIwMTg4NjEsImV4cCI6MjA3NzU5NDg2MX0.h-dwszog4JSv1FmvOm8OLF4Wjq546dvr4QOJfHiJCvg"
+PROJECT_ID="ohvsrapyopgbsissbvpv"
+PROJECT_URL="https://ohvsrapyopgbsissbvpv.supabase.co"
+ANON_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9odnNyYXB5b3BnYnNpc3NidnB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjkwODIsImV4cCI6MjA4NTcwNTA4Mn0.DE4tBkzdyfz4KTogozry3TrUzlQvn5lOngK9rZpheNs"
 
 echo "📋 Project Information:"
 echo "  Project ID: $PROJECT_ID"

@@ -73,6 +73,11 @@ const MarketTrade = () => {
   const selected = parsed ?? { asset: "BTC", timeframe: "hourly" as const };
   const { yesProb, baseline, currentPrice } = useMarketData(selected.asset, selected.timeframe);
 
+  // Derive canonical backend market ID from slug: "BTC-hourly" → "btc-hourly"
+  const canonicalMarketId = slug
+    ? slug.toLowerCase().replace(/[^a-z0-9-]/g, '-')
+    : undefined;
+
   // Timeline state — scoped to selected card's timeframe
   const currentPeriodStart = useMemo(
     () => getCurrentPeriodStart(selected.timeframe),
@@ -176,7 +181,7 @@ const MarketTrade = () => {
 
         {/* Right: order form + rules */}
         <div className="col-span-3 border-l border-border hidden lg:flex flex-col overflow-hidden">
-          <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
+          <OrderForm asset={selected.asset} yesProb={yesProb} marketId={canonicalMarketId} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
           <div className="border-t border-border" />
           <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
         </div>
@@ -192,7 +197,7 @@ const MarketTrade = () => {
           </DrawerTrigger>
           <DrawerContent className="max-h-[85vh]">
             <div className="overflow-y-auto">
-              <OrderForm asset={selected.asset} yesProb={yesProb} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
+              <OrderForm asset={selected.asset} yesProb={yesProb} marketId={canonicalMarketId} onSideChange={setActiveSide} externalLimitPrice={clickedPrice} isLeverage={selected.timeframe === "daily"} />
               <div className="border-t border-border" />
               <MarketRules asset={selected.asset} timeframe={selected.timeframe} />
             </div>

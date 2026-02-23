@@ -38,7 +38,7 @@ export const mockWalletAPI: WalletAPI = {
   },
 
   async getDepositAddress(): Promise<DepositAddress> {
-    return { address: '0x091822d60dEFD28Ce70e90956e5EfF26f97a91Da', network: 'optimism', chainId: 11155420 };
+    return { address: '0x091822d60dEFD28Ce70e90956e5EfF26f97a91Da', network: 'arbitrum', chainId: 421614 };
   },
 
   async deposit(amount: number) {

@@ -9,6 +9,18 @@ import { CreatePriceAlertModal } from "./CreatePriceAlertModal";
 import { MarketAnalysisChat } from "./MarketAnalysisChat";
 import { Button } from "@/components/ui/button";
 import { useCountdown } from "@/hooks/useCountdown";
+import { BinaryProbabilityBar } from "./BinaryProbabilityBar";
+
+/** Safely render a probability integer; returns "—" for undefined/NaN/Infinity. */
+function safeProb(value: number | undefined): string {
+  if (value === undefined || value === null) return "—";
+  const n = typeof value === "number" ? value : Number(value);
+  if (!isFinite(n) || isNaN(n)) {
+    console.warn("[MarketCard] Received invalid probability value:", value);
+    return "—";
+  }
+  return String(Math.round(Math.min(100, Math.max(0, n))));
+}
 
 interface MarketCardProps {
   id?: string;
@@ -113,22 +125,25 @@ const MarketCard = ({
           </div>
 
           {/* Probability Display */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <button 
-              onClick={handleYesBet}
-              className="text-center p-3 rounded-md bg-success/10 hover:bg-success/20 transition-colors duration-150 border border-success/20"
-            >
-              <div className="text-2xl font-bold text-success">{yesPercentage}%</div>
-              <div className="text-xs font-medium text-success/80 uppercase tracking-wide">Yes</div>
-            </button>
+          <div className="mb-4 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={handleYesBet}
+                className="text-center p-3 rounded-md bg-success/10 hover:bg-success/20 transition-colors duration-150 border border-success/20"
+              >
+                <div className="text-2xl font-bold text-success">{safeProb(yesPercentage)}%</div>
+                <div className="text-xs font-medium text-success/80 uppercase tracking-wide">Yes</div>
+              </button>
 
-            <button 
-              onClick={handleNoBet}
-              className="text-center p-3 rounded-md bg-destructive/10 hover:bg-destructive/20 transition-colors duration-150 border border-destructive/20"
-            >
-              <div className="text-2xl font-bold text-destructive">{noPercentage}%</div>
-              <div className="text-xs font-medium text-destructive/80 uppercase tracking-wide">No</div>
-            </button>
+              <button 
+                onClick={handleNoBet}
+                className="text-center p-3 rounded-md bg-destructive/10 hover:bg-destructive/20 transition-colors duration-150 border border-destructive/20"
+              >
+                <div className="text-2xl font-bold text-destructive">{safeProb(noPercentage)}%</div>
+                <div className="text-xs font-medium text-destructive/80 uppercase tracking-wide">No</div>
+              </button>
+            </div>
+            <BinaryProbabilityBar yesProb={yesPercentage} size="sm" />
           </div>
 
           {/* Stats */}

@@ -412,7 +412,7 @@ export function DepositModal({ open, onOpenChange, initialTarget }: DepositModal
 
               <Button variant="outline" className="w-full" asChild>
                 <a
-                  href={`https://arbiscan.io/address/${targetAddress}`}
+                  href={`https://sepolia.arbiscan.io/address/${targetAddress}`}
                   target="_blank"
                   rel="noopener noreferrer"
                 >

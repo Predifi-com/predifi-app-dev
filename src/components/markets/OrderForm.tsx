@@ -8,13 +8,14 @@ import { Slider } from "@/components/ui/slider";
 import { Wallet, TrendingUp, AlertCircle, ShieldAlert, Zap } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useWallet } from "@/hooks/useWallet";
-import { walletAPI } from "@/services/wallet-provider";
 import type { WalletBalance } from "@/types/wallet";
 import { toast } from "sonner";
 import { OrderConfirmModal } from "./OrderConfirmModal";
 import { StopLossTakeProfit } from "./StopLossTakeProfit";
 import { SessionTradeHistory, type TradeEntry } from "./SessionTradeHistory";
 import { useTradingStore } from "@/hooks/useTradingStore";
+import { localBackend } from "@/services/local-backend";
+import { usePredifiWallet } from "@/contexts/PredifiWalletContext";
 
 const MIN_ORDER = 3;
 const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
@@ -22,13 +23,15 @@ const LEVERAGE_OPTIONS = [1, 2, 3, 5] as const;
 interface OrderFormProps {
   asset: string;
   yesProb: number;
+  /** Canonical market ID in the backend (e.g. "btc-hourly", "eth-daily") */
+  marketId?: string;
   onSideChange?: (side: "yes" | "no") => void;
   externalLimitPrice?: number | null;
   /** Whether this market supports leverage (daily markets) */
   isLeverage?: boolean;
 }
 
-export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, isLeverage = false }: OrderFormProps) {
+export function OrderForm({ asset, yesProb, marketId, onSideChange, externalLimitPrice, isLeverage = false }: OrderFormProps) {
   const [orderType, setOrderType] = useState<"market" | "limit">("market");
   const [side, setSide] = useState<"yes" | "no">("yes");
   const [amount, setAmount] = useState("10");
@@ -43,16 +46,24 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
 
   const { isConnected } = useWallet();
   const { openPosition } = useTradingStore();
+  const { connectedWallet } = usePredifiWallet();
+  const walletAddress = connectedWallet?.address ?? null;
 
-  // Load balance from wallet API
+  // Load balance — prefer real backend balance if wallet connected
   const loadBalance = useCallback(async () => {
     try {
-      const data = await walletAPI.getBalance();
-      setBalance(data);
+      if (walletAddress) {
+        const data = await localBackend.getBalance(walletAddress);
+        setBalance({
+          available: Number(data.available),
+          locked: Number(data.locked),
+          total: Number(data.total),
+        } as WalletBalance);
+      }
     } catch (err) {
       console.error('Failed to load balance:', err);
     }
-  }, []);
+  }, [walletAddress]);
 
   useEffect(() => {
     loadBalance();
@@ -103,29 +114,37 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
   };
 
   const executeOrder = useCallback(async () => {
-    // Deduct the margin amount from wallet balance
-    const marginAmount = numAmount; // margin = entered amount, regardless of leverage
-    try {
-      await walletAPI.deductTrade(marginAmount);
-      await loadBalance(); // refresh balance after deduction
-    } catch (err: any) {
-      toast.error(err.message || 'Trade failed: insufficient balance');
-      return;
+    const marginAmount = numAmount;
+    const sideUpper = side.toUpperCase() as 'YES' | 'NO';
+
+    // ── Real backend call (when market ID + wallet address available) ────────
+    if (marketId && walletAddress) {
+      try {
+        await localBackend.openPosition({
+          walletAddress: walletAddress,
+          marketId,
+          side: sideUpper,
+          amount: marginAmount,
+        });
+        await loadBalance();
+      } catch (err: any) {
+        toast.error(err.message || 'Trade failed');
+        return;
+      }
     }
 
     const timeframe = isLeverage ? 'daily' : 'hourly';
     const marketLabel = `${asset} ${timeframe.charAt(0).toUpperCase() + timeframe.slice(1)}`;
-    const sideUpper = side.toUpperCase() as 'YES' | 'NO';
     const shares = effectivePrice > 0 ? effectiveAmount / (effectivePrice / 100) : 0;
 
-    // Open position in shared store (also creates notification)
+    // Also update the local position store (notifications + UI)
     openPosition({
       id: crypto.randomUUID(),
       asset,
       timeframe,
       market: marketLabel,
       side: sideUpper,
-      size: numAmount,
+      size: marginAmount,
       shares,
       entryPrice: effectivePrice,
       leverage,
@@ -137,7 +156,7 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
       asset,
       side,
       orderType,
-      amount: numAmount,
+      amount: marginAmount,
       leverage,
       price: effectivePrice,
       timestamp: Date.now(),
@@ -148,8 +167,8 @@ export function OrderForm({ asset, yesProb, onSideChange, externalLimitPrice, is
     const slTpLabel = leverage > 1 && (slTp.stopLoss || slTp.takeProfit)
       ? ` · SL:${slTp.stopLoss || "—"} TP:${slTp.takeProfit || "—"}`
       : "";
-    toast.success(`${orderType === "market" ? "Market" : "Limit"} order filled: ${shares.toFixed(1)} ${sideUpper} shares at ${effectivePrice.toFixed(1)}¢ for $${numAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
-  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp, loadBalance, isLeverage, openPosition]);
+    toast.success(`${orderType === "market" ? "Market" : "Limit"} order filled: ${shares.toFixed(1)} ${sideUpper} shares at ${effectivePrice.toFixed(1)}¢ for $${marginAmount.toFixed(2)} USDC${leverage > 1 ? ` (${leverage}x)` : ""}${slTpLabel}`);
+  }, [asset, side, orderType, numAmount, leverage, effectivePrice, effectiveAmount, slTp, loadBalance, isLeverage, openPosition, marketId, walletAddress]);
 
   const handlePlaceOrder = () => {
     if (numAmount < MIN_ORDER) {

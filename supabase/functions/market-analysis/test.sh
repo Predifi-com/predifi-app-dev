@@ -17,7 +17,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 FUNCTION_URL="${SUPABASE_FUNCTION_URL:-https://your-project.supabase.co/functions/v1/market-analysis}"
-ANON_KEY="${SUPABASE_ANON_KEY:-your-anon-key}"
+ANON_KEY="${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9odnNyYXB5b3BnYnNpc3NidnB2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxMjkwODIsImV4cCI6MjA4NTcwNTA4Mn0.DE4tBkzdyfz4KTogozry3TrUzlQvn5lOngK9rZpheNs}"
 
 echo "📝 Configuration:"
 echo "  Function URL: $FUNCTION_URL"

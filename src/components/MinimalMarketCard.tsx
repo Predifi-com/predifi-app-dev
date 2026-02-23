@@ -1,6 +1,7 @@
 import { Bot, Clock, Layers } from "lucide-react";
 import { getCategoryIcon } from "@/lib/category-icons";
 import { motion } from "framer-motion";
+import { BinaryProbabilityBar } from "./BinaryProbabilityBar";
 import { useState, useMemo } from "react";
 import { MarketExpandedModal } from "./MarketExpandedModal";
 import { MarketAnalysisChat } from "./MarketAnalysisChat";
@@ -193,30 +194,7 @@ export function MinimalMarketCard({
             </div>
           ) : (
             /* ── Binary: YES/NO bar ── */
-            <>
-              <div className="flex h-7 rounded-lg overflow-hidden">
-                <div
-                  className="flex items-center justify-center text-xs font-bold text-white bg-emerald-500 transition-all"
-                  style={{ width: `${Math.max(yesPercentage, 8)}%` }}
-                >
-                  {yesPercentage >= 15 && `${yesPercentage.toFixed(0)}%`}
-                </div>
-                <div
-                  className="flex items-center justify-center text-xs font-bold text-white bg-red-500 transition-all"
-                  style={{ width: `${Math.max(noPercentage, 8)}%` }}
-                >
-                  {noPercentage >= 15 && `${noPercentage.toFixed(0)}%`}
-                </div>
-              </div>
-              <div className="flex justify-between mt-1.5 text-xs text-muted-foreground">
-                <span>
-                  Yes <span className="font-semibold text-emerald-500">{yesPercentage.toFixed(0)}%</span>
-                </span>
-                <span>
-                  No <span className="font-semibold text-red-500">{noPercentage.toFixed(0)}%</span>
-                </span>
-              </div>
-            </>
+            <BinaryProbabilityBar yesProb={yesPercentage} />
           )}
         </div>
 
