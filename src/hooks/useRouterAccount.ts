@@ -45,9 +45,6 @@ export interface RouterAccountState {
   /** Re-check router state and balance */
   refresh: () => Promise<void>;
 }
-  /** Re-check deployment status and balance */
-  refresh: () => Promise<void>;
-}
 
 // ─── RPC provider (read-only, no wallet needed) ───────────────────────────────
 
