@@ -4,7 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@/providers/ThemeProvider";
-import { DynamicContextProvider, EmbeddedWalletConnectors } from "@dynamic-labs/sdk-react-core";
+import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
 import { FlowWalletConnectors } from "@dynamic-labs/flow";
@@ -59,7 +59,6 @@ const App = () => (
             settings={{
               environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID ?? "cab69ff3-3f2b-440c-8a0f-f91d44566166",
               walletConnectors: [
-                EmbeddedWalletConnectors,  // social login: Google / email / Twitter
                 EthereumWalletConnectors,
                 BitcoinWalletConnectors,
                 FlowWalletConnectors,
