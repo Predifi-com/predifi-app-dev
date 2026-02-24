@@ -6,10 +6,6 @@ import { BrowserRouter } from "react-router-dom";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { DynamicContextProvider } from "@dynamic-labs/sdk-react-core";
 import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-import { BitcoinWalletConnectors } from "@dynamic-labs/bitcoin";
-import { FlowWalletConnectors } from "@dynamic-labs/flow";
-import { StarknetWalletConnectors } from "@dynamic-labs/starknet";
-import { SuiWalletConnectors } from "@dynamic-labs/sui";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { SEO } from "@/components/SEO";
 import { CookieConsent } from "@/components/CookieConsent";
@@ -60,10 +56,6 @@ const App = () => (
               environmentId: import.meta.env.VITE_DYNAMIC_ENVIRONMENT_ID ?? "cab69ff3-3f2b-440c-8a0f-f91d44566166",
               walletConnectors: [
                 EthereumWalletConnectors,
-                BitcoinWalletConnectors,
-                FlowWalletConnectors,
-                StarknetWalletConnectors,
-                SuiWalletConnectors,
               ],
             }}
           >

@@ -214,7 +214,8 @@ const Markets = () => {
       const shortLabels = extractUniqueSegments(rawLabels);
       const outcomes = groupMarkets.map((m, i) => ({
         label: shortLabels[i],
-        probability: m.yes_price ?? 50,
+        // yes_price is 0-1 decimal; convert to 0-100 integer for probability display
+        probability: Math.round((m.yes_price ?? 0.5) * 100),
       }));
 
       items.push({
@@ -253,10 +254,12 @@ const Markets = () => {
           id: market.id,
           title: market.title,
           description: market.description || '',
-          yesPrice: (market.yes_price ?? 50) / 100,
-          noPrice: (market.no_price ?? 50) / 100,
-          yesPercentage: market.yes_price ?? 50,
-          noPercentage: market.no_price ?? 50,
+          // yes_price/no_price are 0-1 decimals from the API
+          yesPrice: market.yes_price ?? 0.5,
+          noPrice: market.no_price ?? 0.5,
+          // Convert to 0-100 integer for the probability bar
+          yesPercentage: Math.round((market.yes_price ?? 0.5) * 100),
+          noPercentage: Math.round((market.no_price ?? 0.5) * 100),
           totalVolume: effectiveVolume,
           liquidity: market.liquidity ?? 0,
           volume24h: market.volume_24h ?? 0,

@@ -13,13 +13,9 @@
   "dependencies": {
     "@account-kit/react": "^4.77.1",
     "@account-kit/signer": "^4.77.1",
-    "@dynamic-labs/bitcoin": "^4.45.2",
     "@dynamic-labs/ethereum": "^4.45.2",
-    "@dynamic-labs/flow": "^4.45.2",
     "@dynamic-labs/sdk-react-core": "^4.45.2",
     "@dynamic-labs/solana": "^4.45.2",
-    "@dynamic-labs/starknet": "^4.45.2",
-    "@dynamic-labs/sui": "^4.45.2",
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@farcaster/auth-kit": "^0.8.1",
