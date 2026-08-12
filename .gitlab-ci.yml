@@ -1,9 +1,9 @@
 stages: [validate, test, mirror]
+variables:
+  NODE_OPTIONS: --max-old-space-size=4096
 default:
   tags: [predifi-test, x86, docker]
   interruptible: true
-  variables:
-    NODE_OPTIONS: --max-old-space-size=4096
 workflow:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
