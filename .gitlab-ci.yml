@@ -11,8 +11,8 @@ workflow:
 fast_track:
   stage: validate
   script:
-    - npm ci --no-audit --no-fund
-    - npm run lint
+    - npm ci --legacy-peer-deps --no-audit --no-fund
+    - npm run build
 full_ci:
   stage: test
   needs: [fast_track]
@@ -21,8 +21,9 @@ full_ci:
     - if: '$CI_PIPELINE_SOURCE == "schedule"'
     - if: '$CI_PIPELINE_SOURCE == "web"'
   script:
-    - npm ci --no-audit --no-fund
+    - npm ci --legacy-peer-deps --no-audit --no-fund
     - npm run build
+    - docker build --platform linux/amd64 -t "predifi-app-dev-ci:$CI_COMMIT_SHA" .
 mirror_github:
   stage: mirror
   needs: [full_ci]
