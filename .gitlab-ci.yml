@@ -1,0 +1,34 @@
+stages: [validate, test, mirror]
+default:
+  tags: [predifi-test, x86, docker]
+  interruptible: true
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+fast_track:
+  stage: validate
+  script:
+    - npm ci --no-audit --no-fund
+    - npm run lint
+full_ci:
+  stage: test
+  needs: [fast_track]
+  rules:
+    - if: '$CI_COMMIT_REF_PROTECTED == "true"'
+    - if: '$CI_PIPELINE_SOURCE == "schedule"'
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+  script:
+    - npm ci --no-audit --no-fund
+    - npm run build
+mirror_github:
+  stage: mirror
+  needs: [full_ci]
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
+  script:
+    - test -n "$GITHUB_PUSH_TOKEN"
+    - git remote add github "https://github.com/Predifi-com/predifi-app-dev.git"
+    - git -c 'credential.helper=!f() { echo username=x-access-token; echo password=$GITHUB_PUSH_TOKEN; }; f' push github "$CI_COMMIT_SHA:refs/heads/$CI_DEFAULT_BRANCH"
