@@ -12,8 +12,11 @@ COPY package.json package-lock.json* ./
 RUN npm ci --legacy-peer-deps
 # Copy source
 COPY . .
-# Build static assets
-RUN npm run build
+# Vite/Rollup traverses the complete wallet SDK dependency graph here. Node's
+# default heap is too small for a clean amd64 container build even when the CI
+# runner still has several GiB available, so raise only this build process's
+# heap ceiling. The runtime image below does not inherit this setting.
+RUN NODE_OPTIONS=--max-old-space-size=4096 npm run build
 
 FROM node:20.20.2-bookworm-slim AS runtime
 WORKDIR /app
